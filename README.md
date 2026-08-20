@@ -199,6 +199,35 @@ response correlation, against a fake bridge process in `test-fixtures/`) —
 it deliberately does **not** re-test `hydroqc`'s own login flow or peak math;
 that's upstream's job, and upstream already has its own test suite.
 
+### Testing the built image against a real Hydro-Québec account
+
+Standing up a full local Gladys instance just to check "does my login/
+contract actually work" is slow. `scripts/debug_bridge.py` skips that: it
+builds the image (or reuses it) and speaks the bridge's own protocol
+straight to a throwaway container, printing the pretty-printed JSON response
+— no Gladys involved.
+
+```bash
+export HQ_USERNAME=you@example.com
+export HQ_PASSWORD=secret
+
+python3 scripts/debug_bridge.py login              # just check the credentials
+python3 scripts/debug_bridge.py discover            # list every contract on the account
+python3 scripts/debug_bridge.py poll 0123456789     # one contract's full poll snapshot
+
+# Iterating on bridge/hq_bridge.py itself? Skip the rebuild:
+SKIP_BUILD=1 python3 scripts/debug_bridge.py poll 0123456789
+```
+
+For quick ad-hoc pokes at the image, an interactive shell is also still
+available (deliberately not a distroless image, see "Image size and attack
+surface" above):
+
+```bash
+docker run --rm -it --entrypoint sh gladys-hydro-quebec:dev
+# inside: /opt/venv/bin/python3 -c "import hydroqc; print(hydroqc.__file__)"
+```
+
 ## Keeping `hydroqc` up to date
 
 `bridge/requirements.txt` pins an exact `Hydro-Quebec-API-Wrapper` version

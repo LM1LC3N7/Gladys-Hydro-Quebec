@@ -214,6 +214,11 @@ async def main() -> None:
     await loop.connect_read_pipe(lambda: protocol, sys.stdin)
 
     logger.info("Hydro-Québec bridge ready")
+    # Tracked so stdin closing doesn't cut off a response that's still being
+    # computed (Node normally keeps stdin open for the container's whole
+    # life, but a manual `echo ... | docker run ...` test closes it as soon
+    # as the last line is written).
+    pending_tasks: set[asyncio.Task[None]] = set()
     while True:
         line = await reader.readline()
         if not line:
@@ -224,10 +229,13 @@ async def main() -> None:
         # Fire-and-forget: requests are already serialized on the Node side,
         # but running each in its own task avoids one slow command blocking
         # stdin readline processing of the next one.
-        asyncio.create_task(handle_request(stripped))
-        # Yield control so the task above actually starts before we block on
-        # the next readline() (keeps stdout ordering close to request order).
-        await asyncio.sleep(0)
+        task = asyncio.create_task(handle_request(stripped))
+        pending_tasks.add(task)
+        task.add_done_callback(pending_tasks.discard)
+
+    if pending_tasks:
+        logger.info("stdin closed with %d request(s) still in flight, waiting...", len(pending_tasks))
+        await asyncio.gather(*pending_tasks, return_exceptions=True)
 
 
 if __name__ == "__main__":
