@@ -5,4 +5,4 @@
 # (.github/dependabot.yml) opens a PR to bump this pin on a schedule, CI
 # (.github/workflows/ci.yml) validates it, and merging + cutting a release is
 # what actually ships the update.
-Hydro-Quebec-API-Wrapper==4.0.0
+Hydro-Quebec-API-Wrapper==4.2.6
