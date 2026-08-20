@@ -1,0 +1,66 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "Hydro-Québec",
+  "description": {
+    "en": "Monitor your Hydro-Québec electricity consumption, Winter Credit (CPC) and Flex D (DPC) peak events, billing and outages, for every contract linked to your account.",
+    "fr": "Suivez votre consommation électrique Hydro-Québec, les pointes du Crédit Hivernal (CPC) et de Flex D (DPC), la facturation et les pannes, pour chaque contrat lié à votre compte."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.0",
+  "gladys_version": ">=4.86.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/master/cover.png",
+  "categories": ["energy"],
+  "transports": ["cloud"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": { "en": "Hydro-Québec account", "fr": "Compte Hydro-Québec" },
+      "description": {
+        "en": "Use the same email/username and password you use to sign in to the Hydro-Québec customer space (session.hydroquebec.com). This integration is developed independently and is not supported by Hydro-Québec: do not contact Hydro-Québec customer service about it.",
+        "fr": "Utilisez le même courriel/identifiant et mot de passe que pour vous connecter à l'Espace client Hydro-Québec (session.hydroquebec.com). Cette intégration est développée de façon indépendante et n'est pas supportée par Hydro-Québec : ne contactez pas le service à la clientèle d'Hydro-Québec à son sujet."
+      }
+    },
+    {
+      "key": "username",
+      "type": "secret",
+      "label": { "en": "Email / username", "fr": "Courriel / identifiant" },
+      "description": {
+        "en": "The email address or username used to sign in to your Hydro-Québec online account.",
+        "fr": "Le courriel ou l'identifiant utilisé pour vous connecter à votre compte Hydro-Québec en ligne."
+      },
+      "required": true
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "label": { "en": "Password", "fr": "Mot de passe" },
+      "description": {
+        "en": "Stored encrypted by Gladys and never leaves your instance except to talk to Hydro-Québec.",
+        "fr": "Stocké chiffré par Gladys, il ne quitte jamais votre instance sauf pour parler à Hydro-Québec."
+      },
+      "required": true
+    },
+    {
+      "key": "poll_frequency",
+      "type": "number",
+      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "description": {
+        "en": "How often each contract is refreshed. Hydro-Québec updates daily consumption about once a day with a 1-2 day delay, so there is no benefit in polling faster than every 30-60 minutes.",
+        "fr": "Fréquence de rafraîchissement de chaque contrat. Hydro-Québec ne met à jour la consommation quotidienne qu'une fois par jour, avec 1 à 2 jours de délai : inutile d'interroger plus vite que toutes les 30-60 minutes."
+      },
+      "required": false,
+      "default": 3600,
+      "min": 300,
+      "max": 86400
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "label": { "en": "Test the connection", "fr": "Tester la connexion" },
+      "timeout_seconds": 30
+    }
+  ]
+}
