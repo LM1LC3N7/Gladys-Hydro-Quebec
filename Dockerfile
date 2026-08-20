@@ -25,7 +25,7 @@
 # -----------------------------------------------------------------------------
 
 # ---- Builder: Python deps (hydroqc, pinned in bridge/requirements.txt) ------
-FROM node:24-alpine AS python-builder
+FROM node:26-alpine AS python-builder
 RUN apk add --no-cache python3 py3-pip
 RUN python3 -m venv /opt/venv
 COPY bridge/requirements.txt /tmp/requirements.txt
@@ -38,7 +38,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir --only-binary=:all: -r /tmp/require
               /opt/venv/bin/pip*
 
 # ---- Builder: Node deps -------------------------------------------------------
-FROM node:24-alpine AS node-builder
+FROM node:26-alpine AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # --ignore-scripts: none of our dependencies need an install-time build step,
@@ -47,7 +47,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --ignore-scripts
 
 # ---- Final runtime -------------------------------------------------------------
-FROM node:24-alpine
+FROM node:26-alpine
 
 # dumb-init: correct PID 1 signal handling AND zombie reaping - more important
 # here than in a plain Node image, since this container also runs a Python
