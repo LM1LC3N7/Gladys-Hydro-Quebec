@@ -121,6 +121,47 @@ All three Python↔Node calls are serialized (an `asyncio.Lock` in
 portal, token refresh state), so two commands running at once could corrupt
 each other's session.
 
+## Image size and attack surface
+
+The `Dockerfile` is a 3-stage build specifically to keep the final image
+small and the tools available inside it minimal:
+
+- `python-builder` and `node-builder` each install one side's dependencies
+  (`pip`, `py3-pip`'s build machinery, `npm`) — none of that ships in the
+  final image, only the results: `/opt/venv` and `node_modules`.
+- `hydroqc`'s dependencies (`aiohttp`, `python-dateutil`, `pytz`) all publish
+  prebuilt `musllinux` (Alpine-compatible) wheels for both amd64 and arm64,
+  so `pip install --only-binary=:all:` never needs a C compiler — no
+  `gcc`/`musl-dev` anywhere, even at build time.
+- `pip`, `setuptools` and `wheel` are stripped out of the venv right after
+  install (build-time only; nothing in `bridge/hq_bridge.py` imports them) —
+  about 27 MB off `site-packages`, verified locally.
+- `npm ci --omit=dev --ignore-scripts`: no devDependencies, and no
+  lifecycle script from a (compromised) transitive dependency gets to run
+  arbitrary code at install time — none of ours declare one, so this is free.
+- The final stage installs only `dumb-init` (correct PID 1 signal handling
+  _and_ zombie reaping — more important here than in a plain Node image,
+  since this container also runs a Python child process to reap) and a bare
+  `python3` interpreter (no `pip`, no compiler).
+
+**Why not a smaller/alternate JS runtime (Deno, "the Rust one")?** Not
+recommended here: the official `@gladysassistant/integration-sdk` is an npm
+package whose behavior under Deno's Node-compat layer is untested, and this
+integration also `spawn()`s a child process (`node:child_process`) — another
+untested surface under Deno. The size/attack-surface win in this image comes
+overwhelmingly from Python/npm build-time tooling, not from the JS runtime
+itself, so swapping it would add real compatibility risk for little
+additional gain. If that trade-off is ever worth revisiting, it's a separate,
+deliberate experiment — not a drop-in change.
+
+Two further, more invasive options exist if even less surface is wanted
+later: a distroless final stage (no shell/package manager at all — harder to
+`docker exec` into for troubleshooting a login issue) or a hardened base like
+Chainguard's `cgr.dev/chainguard/node`. Neither is wired up: both are a
+bigger departure from the plain `node:*-alpine` base the official
+[integration-template-js](https://github.com/GladysAssistant/integration-template-js)
+ships, worth doing only as its own deliberate follow-up.
+
 ## Local development
 
 Node side:
@@ -184,11 +225,10 @@ is what actually ships the update.
   [integration-template-js](https://github.com/GladysAssistant/integration-template-js)
   publishing flow) still need to be added before this can be submitted to the
   Gladys integration store.
-- The Docker build (Node + a Python venv on `node:24-alpine`) has not been
-  verified end-to-end against a real Docker daemon in this environment; the
-  `hydroqc` wheel is pure Python (`py3-none-any`, no compiled extensions), so
-  it should be Alpine/musl-compatible, but this should be confirmed with a
-  real `docker build` + a real login before a first release.
+- The Docker build itself (see "Image size and attack surface" above) has not
+  been verified end-to-end against a real Docker daemon in this environment —
+  wheel availability was checked directly against PyPI, but a real
+  `docker build` + a real login should still happen before a first release.
 - `hydroqc`'s own disclaimer applies here too: this is a non-official way to
   access Hydro-Québec's data, and it can break whenever Hydro-Québec changes
   its portal.
