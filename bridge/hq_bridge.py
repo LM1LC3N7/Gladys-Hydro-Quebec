@@ -131,6 +131,10 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         raise HydroQcError(f"Unknown contract {contract_id}: call discover first")
     contract, account, _customer = entry
 
+    preheat_duration_minutes = params.get("preheat_duration_minutes")
+    if preheat_duration_minutes is not None and hasattr(contract, "set_preheat_duration"):
+        contract.set_preheat_duration(int(preheat_duration_minutes))
+
     await account.get_info()
     await contract.get_periods_info()
     daily = await contract.get_today_daily_consumption()

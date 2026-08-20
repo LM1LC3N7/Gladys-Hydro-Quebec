@@ -65,8 +65,10 @@ export class HydroQcSession {
   }
 
   /** Fetch every value one contract-device needs for one poll cycle. */
-  async fetchContractSnapshot(contract) {
-    return this.bridge.call('poll', { contract_id: contract.contractId }, { timeoutMs: 60_000 });
+  async fetchContractSnapshot(contract, preheatDurationMinutes) {
+    const params = { contract_id: contract.contractId };
+    if (preheatDurationMinutes !== undefined) params.preheat_duration_minutes = preheatDurationMinutes;
+    return this.bridge.call('poll', params, { timeoutMs: 60_000 });
   }
 
   stop() {

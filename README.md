@@ -91,6 +91,52 @@ code has to change.
 └─ Dockerfile                     # node:24-alpine + a Python venv for hydroqc
 ```
 
+## The Configuration screen
+
+There is no custom UI code in this repo, and there cannot be: an external
+integration has no screen of its own. Gladys auto-generates the whole
+Configuration screen from `config_schema` in the manifest — that's the only
+"GUI" an integration gets, by design. Ours renders as:
+
+- An intro section (with links to `session.hydroquebec.com` and the
+  `hydroqc` project) explaining that the _same_ credentials as the
+  Hydro-Québec customer space are used, and that every contract on the
+  account is discovered automatically — **no account/contract/meter number
+  to type in**, unlike raw `hydroqc2mqtt` config.
+- **Email/username** and **Password** (`secret` fields: masked, stored
+  encrypted by Gladys).
+- **Refresh interval** and **Pre-heat duration** (`number` fields, sane
+  defaults).
+- A **Test the connection** button (the `test_connection` manifest action)
+  that does a real login and reports success or the exact failure inline.
+
+After saving, the discovered contracts show up as devices in Gladys'
+**Discovery** tab — nothing to configure per contract either.
+
+### Installing it in a real Gladys instance
+
+Gladys can install an external integration two ways (Integrations page ->
+**"Installer depuis GitHub"**, top of the page):
+
+1. **From a GitHub repo URL** (the primary field of that dialog) — Gladys
+   resolves the repo's default branch, fetches
+   `gladys-assistant-integration.json` from it, and pulls `docker_image` from
+   a registry. **This needs `.github/workflows/release.yml` to have run at
+   least once** (Actions tab -> Release -> Run workflow) and the resulting
+   `ghcr.io` package to be set **Public** in its package settings — Gladys
+   has no way to authenticate to a private registry. Until then this mode
+   fails with "Unable to pull image".
+2. **"Mode développeur" / developer mode** (the collapsible link under that
+   same field) — paste a Docker image tag built with a plain `docker build`
+   **on the same Docker host Gladys runs on**, no registry involved at all
+   (Gladys falls back to the local image when the pull fails). Optionally
+   paste the manifest JSON too, though pointing it at this repo's
+   `gladys-assistant-integration.json` content works. This is the fast path
+   for iterating locally: `docker build -t gladys-hydro-quebec:dev .`, then
+   paste `gladys-hydro-quebec:dev` in developer mode (see also "Testing the
+   built image" under Local development, below, for checking credentials
+   _before_ wiring up Gladys at all).
+
 ## The bridge protocol
 
 One JSON object per line, both ways. Node → Python:
@@ -249,11 +295,17 @@ is what actually ships the update.
 - The "average daily cost" feature is the current billing period's average
   $/day (`contract.cp_daily_bill_mean`): Hydro-Québec's API does not expose
   an exact $ figure per individual day for the base "D" rate.
-- `cover.png` (800×534, ≤150 KB) and a GitHub Actions release workflow
-  (multi-arch build to `ghcr.io`, per the
-  [integration-template-js](https://github.com/GladysAssistant/integration-template-js)
-  publishing flow) still need to be added before this can be submitted to the
-  Gladys integration store.
+- `cover.png` (800×534, ≤150 KB) still needs to be added before this can be
+  submitted to the Gladys integration store. `.github/workflows/release.yml`
+  (multi-arch build to `ghcr.io`) exists but has never been run in this
+  environment (no Docker daemon here) — see its header comment for the two
+  one-time manual GitHub settings it depends on (workflow permissions, GHCR
+  package visibility).
+- GitHub's own "default branch" setting for this repo may not point at
+  `main` — `installFromRepoUrl` (the "Install from GitHub" screen) resolves
+  the manifest from whatever GitHub reports as the default branch via its
+  API, not necessarily `main`. Check/set it under Settings -> Branches if a
+  repo-URL install doesn't pick up recent manifest changes.
 - The Docker build itself (see "Image size and attack surface" above) has not
   been verified end-to-end against a real Docker daemon in this environment —
   wheel availability was checked directly against PyPI, but a real

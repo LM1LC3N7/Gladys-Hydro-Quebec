@@ -101,7 +101,7 @@ gladys.onPoll(async (device) => {
     return;
   }
   try {
-    await pollContractDevice(gladys, session, contract);
+    await pollContractDevice(gladys, session, contract, config);
     await gladys.setConnectionStatus(true);
   } catch (err) {
     logger.error(`Poll failed for contract ${contract.contractId}`, err);

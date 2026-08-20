@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = {
   username: '',
   password: '',
   poll_frequency: 3600, // seconds; must match the manifest's default.
+  preheat_duration_minutes: 180, // minutes; must match the manifest's default (hydroqc's own default).
 };
 
 export function normalizeConfig(raw = {}) {
@@ -18,6 +19,7 @@ export function normalizeConfig(raw = {}) {
     ...DEFAULT_CONFIG,
     ...raw,
     poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
+    preheat_duration_minutes: Number(raw.preheat_duration_minutes ?? DEFAULT_CONFIG.preheat_duration_minutes),
   };
 }
 

@@ -249,9 +249,9 @@ export function buildContractDevice(gladys, contract, config) {
  * current_state, critical hours called...), not raw API payloads: there is
  * no Hydro-Québec-specific parsing left to do here.
  */
-export async function pollContractDevice(gladys, session, contract) {
+export async function pollContractDevice(gladys, session, contract, config) {
   const ids = gladys.externalIds('contract', contract.contractId);
-  const snapshot = await session.fetchContractSnapshot(contract);
+  const snapshot = await session.fetchContractSnapshot(contract, config?.preheat_duration_minutes);
   const states = [];
 
   const pushNumber = (key, value) => {

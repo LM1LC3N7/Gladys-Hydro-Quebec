@@ -3,13 +3,13 @@
   "type": "device",
   "name": "Hydro-Québec",
   "description": {
-    "en": "Monitor your Hydro-Québec electricity consumption, Winter Credit (CPC) and Flex D (DPC) peak events, billing and outages, for every contract linked to your account.",
-    "fr": "Suivez votre consommation électrique Hydro-Québec, les pointes du Crédit Hivernal (CPC) et de Flex D (DPC), la facturation et les pannes, pour chaque contrat lié à votre compte."
+    "en": "Hydro-Québec electricity consumption, Winter Credit and Flex D peaks, billing and outages.",
+    "fr": "Consommation Hydro-Québec, pointes Crédit Hivernal et Flex D, facturation et pannes."
   },
   "version": "0.1.0",
   "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.0",
   "gladys_version": ">=4.86.0",
-  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/master/cover.png",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/main/cover.png",
   "categories": ["energy"],
   "transports": ["cloud"],
   "config_schema": [
@@ -18,9 +18,22 @@
       "type": "section",
       "label": { "en": "Hydro-Québec account", "fr": "Compte Hydro-Québec" },
       "description": {
-        "en": "Use the same email/username and password you use to sign in to the Hydro-Québec customer space (session.hydroquebec.com). This integration is developed independently and is not supported by Hydro-Québec: do not contact Hydro-Québec customer service about it.",
-        "fr": "Utilisez le même courriel/identifiant et mot de passe que pour vous connecter à l'Espace client Hydro-Québec (session.hydroquebec.com). Cette intégration est développée de façon indépendante et n'est pas supportée par Hydro-Québec : ne contactez pas le service à la clientèle d'Hydro-Québec à son sujet."
-      }
+        "en": "Use the same email/username and password you use to sign in to the Hydro-Québec customer space (session.hydroquebec.com). This integration is developed independently and is not supported by Hydro-Québec: do not contact Hydro-Québec customer service about it. Every contract on the account is discovered automatically after saving — there is nothing else to enter (no account/contract numbers needed).",
+        "fr": "Utilisez le même courriel/identifiant et mot de passe que pour vous connecter à l'Espace client Hydro-Québec (session.hydroquebec.com). Cette intégration est développée de façon indépendante et n'est pas supportée par Hydro-Québec : ne contactez pas le service à la clientèle d'Hydro-Québec à son sujet. Tous les contrats du compte sont découverts automatiquement après l'enregistrement — rien d'autre à saisir (aucun numéro de compte/contrat requis)."
+      },
+      "links": [
+        {
+          "url": "https://session.hydroquebec.com/",
+          "label": { "en": "Hydro-Québec customer space", "fr": "Espace client Hydro-Québec" }
+        },
+        {
+          "url": "https://gitlab.com/hydroqc/hydroqc",
+          "label": {
+            "en": "hydroqc (the library this integration relies on)",
+            "fr": "hydroqc (la librairie utilisée par cette intégration)"
+          }
+        }
+      ]
     },
     {
       "key": "username",
@@ -54,6 +67,19 @@
       "default": 3600,
       "min": 300,
       "max": 86400
+    },
+    {
+      "key": "preheat_duration_minutes",
+      "type": "number",
+      "label": { "en": "Pre-heat duration (min)", "fr": "Durée de préchauffage (min)" },
+      "description": {
+        "en": "How long before a Winter Credit / Flex D critical peak the \"pre-heat in progress\" sensor turns on. Only affects contracts enrolled in one of these options.",
+        "fr": "Combien de temps avant une pointe critique (Crédit Hivernal / Flex D) le capteur « préchauffage en cours » s'active. N'a d'effet que sur les contrats inscrits à l'une de ces options."
+      },
+      "required": false,
+      "default": 180,
+      "min": 0,
+      "max": 360
     }
   ],
   "actions": [
