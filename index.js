@@ -43,9 +43,16 @@ async function publishDevices() {
   await gladys.publishDiscoveredDevices(devices);
 }
 
+function replaceSession(newSession) {
+  // Each HydroQcSession owns a Python bridge subprocess: stop the old one
+  // before dropping the reference, or it would leak as an orphaned process.
+  session?.stop();
+  session = newSession;
+}
+
 async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
   if (!isConfigured(config)) {
-    session = null;
+    replaceSession(null);
     await publishDevices();
     await gladys.setConnectionStatus(false, {
       en: 'Enter your Hydro-Québec email/username and password in the Configuration screen.',
@@ -55,7 +62,7 @@ async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
   }
 
   if (!session || credentialsChanged(session, config)) {
-    session = new HydroQcSession(config.username, config.password, logger);
+    replaceSession(new HydroQcSession(config.username, config.password, logger));
   }
 
   await session.ensureContracts(forceDiscovery);
@@ -115,8 +122,8 @@ gladys.onAction('test_connection', async () => {
       fr: 'Entrez d’abord votre identifiant et votre mot de passe.',
     };
   }
+  const testSession = new HydroQcSession(config.username, config.password, logger);
   try {
-    const testSession = new HydroQcSession(config.username, config.password, logger);
     await testSession.testConnection();
     return { en: 'Login to Hydro-Québec succeeded.', fr: 'Connexion à Hydro-Québec réussie.' };
   } catch (err) {
@@ -124,6 +131,8 @@ gladys.onAction('test_connection', async () => {
       en: `Login failed: ${err.message}`,
       fr: `Échec de la connexion : ${err.message}`,
     };
+  } finally {
+    testSession.stop();
   }
 });
 
@@ -161,6 +170,7 @@ gladys.on('connected', async () => {
 // --- Graceful shutdown -------------------------------------------------------
 gladys.handleShutdown((signal) => {
   logger.info(`Received ${signal} -> graceful shutdown`);
+  session?.stop();
 });
 
 // --- Startup -----------------------------------------------------------------

@@ -1,0 +1,8 @@
+# Community-maintained Hydro-Québec API client (same library hydroqc-ha, the
+# Home Assistant integration, is built on: https://gitlab.com/hydroqc/hydroqc).
+# Pinned (not left open-ended) so a build is reproducible and an upstream
+# release never silently changes behavior in production; Dependabot
+# (.github/dependabot.yml) opens a PR to bump this pin on a schedule, CI
+# (.github/workflows/ci.yml) validates it, and merging + cutting a release is
+# what actually ships the update.
+Hydro-Quebec-API-Wrapper==4.0.0

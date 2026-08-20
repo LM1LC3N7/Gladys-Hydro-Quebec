@@ -3,5 +3,11 @@ data
 .git
 .github
 docs
+test
+test-fixtures
 *.md
 .eslintcache
+**/__pycache__
+**/*.pyc
+.venv
+venv

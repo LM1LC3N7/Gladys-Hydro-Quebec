@@ -240,16 +240,15 @@ export function buildContractDevice(gladys, contract, config) {
   };
 }
 
-/** Parses hydroqc's `hrsCritiquesAppelees` ("H:MM" or "HH:MM:SS"-ish duration string) into hours. */
-function parseHoursString(value) {
-  if (!value || typeof value !== 'string') return null;
-  const parts = value.split(':').map(Number);
-  if (parts.some(Number.isNaN)) return null;
-  const [h = 0, m = 0, s = 0] = parts;
-  return Math.round((h + m / 60 + s / 3600) * 100) / 100;
-}
-
-/** Fetch fresh data for one contract and publish every feature state to Gladys. */
+/**
+ * Fetch fresh data for one contract and publish every feature state to Gladys.
+ *
+ * `session.fetchContractSnapshot()` returns the flat JSON produced by the
+ * `poll` command of bridge/hq_bridge.py - already-derived values straight
+ * from hydroqc's own Contract/PeakHandler properties (cumulated credit,
+ * current_state, critical hours called...), not raw API payloads: there is
+ * no Hydro-Québec-specific parsing left to do here.
+ */
 export async function pollContractDevice(gladys, session, contract) {
   const ids = gladys.externalIds('contract', contract.contractId);
   const snapshot = await session.fetchContractSnapshot(contract);
@@ -264,35 +263,26 @@ export async function pollContractDevice(gladys, session, contract) {
     states.push({ device_feature_external_id: ids.feature(key), text: String(value) });
   };
 
-  const latestDay = snapshot.daily?.results?.[0]?.courant;
-  pushNumber(FEATURE.DAILY_CONSUMPTION, latestDay?.consoTotalQuot);
-  pushNumber(FEATURE.AVG_TEMPERATURE, latestDay?.tempMoyenneQuot);
-
-  const currentPeriod = snapshot.periods?.[0];
-  pushNumber(FEATURE.DAILY_CONSUMPTION_COST, currentPeriod?.moyenneDollarsJourPeriode);
-
-  pushNumber(FEATURE.BALANCE, contract.account?.solde);
-
-  const activeOutage = Boolean(
-    snapshot.outage?.interruptions?.some((interruption) => interruption.etat === 'C' || interruption.etat === 'N'),
-  );
-  pushNumber(FEATURE.POWER_OUTAGE, activeOutage ? 1 : 0);
+  pushNumber(FEATURE.DAILY_CONSUMPTION, snapshot.daily_consumption_kwh);
+  pushNumber(FEATURE.AVG_TEMPERATURE, snapshot.avg_temperature);
+  pushNumber(FEATURE.DAILY_CONSUMPTION_COST, snapshot.daily_cost_mean);
+  pushNumber(FEATURE.BALANCE, snapshot.balance);
+  pushNumber(FEATURE.POWER_OUTAGE, snapshot.outage_active ? 1 : 0);
 
   if (snapshot.cpc) {
-    pushNumber(FEATURE.CPC_CUMULATED_CREDIT, snapshot.cpc.cumulatedCredit);
-    pushNumber(FEATURE.CPC_PROJECTED_CREDIT, snapshot.cpc.projectedCumulatedCredit);
-    pushText(FEATURE.CPC_STATE, snapshot.cpc.currentState);
-    pushNumber(FEATURE.CPC_CRITICAL_PEAK_COMING, snapshot.cpc.isAnyCriticalPeakComing ? 1 : 0);
-    pushNumber(FEATURE.CPC_PREHEAT_IN_PROGRESS, snapshot.cpc.preheatInProgress ? 1 : 0);
+    pushNumber(FEATURE.CPC_CUMULATED_CREDIT, snapshot.cpc.cumulated_credit);
+    pushNumber(FEATURE.CPC_PROJECTED_CREDIT, snapshot.cpc.projected_cumulated_credit);
+    pushText(FEATURE.CPC_STATE, snapshot.cpc.current_state);
+    pushNumber(FEATURE.CPC_CRITICAL_PEAK_COMING, snapshot.cpc.critical_peak_coming ? 1 : 0);
+    pushNumber(FEATURE.CPC_PREHEAT_IN_PROGRESS, snapshot.cpc.preheat_in_progress ? 1 : 0);
   }
 
   if (snapshot.dpc) {
-    pushText(FEATURE.DPC_STATE, snapshot.dpc.currentState);
-    pushNumber(FEATURE.DPC_PEAK_IN_PROGRESS, snapshot.dpc.peakInProgress ? 1 : 0);
-    pushNumber(FEATURE.DPC_PREHEAT_IN_PROGRESS, snapshot.dpc.preheatInProgress ? 1 : 0);
-    const winterInfo = snapshot.dpc.raw?.periodesHiver?.[0];
-    pushNumber(FEATURE.DPC_HOURS_CRITICAL_CALLED, parseHoursString(winterInfo?.hrsCritiquesAppelees));
-    pushNumber(FEATURE.DPC_SAVINGS_VS_BASE, winterInfo?.montantEconPerteVSTarifBase);
+    pushText(FEATURE.DPC_STATE, snapshot.dpc.current_state);
+    pushNumber(FEATURE.DPC_PEAK_IN_PROGRESS, snapshot.dpc.peak_in_progress ? 1 : 0);
+    pushNumber(FEATURE.DPC_PREHEAT_IN_PROGRESS, snapshot.dpc.preheat_in_progress ? 1 : 0);
+    pushNumber(FEATURE.DPC_HOURS_CRITICAL_CALLED, snapshot.dpc.critical_called_hours);
+    pushNumber(FEATURE.DPC_SAVINGS_VS_BASE, snapshot.dpc.amount_saved_vs_base_rate);
   }
 
   if (states.length === 0) {

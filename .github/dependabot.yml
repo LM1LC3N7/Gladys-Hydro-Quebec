@@ -1,0 +1,34 @@
+# Keeps every dependency this integration ships up to date, most importantly
+# `Hydro-Quebec-API-Wrapper` (the community-maintained `hydroqc` library this
+# whole integration is a thin adapter over, see bridge/hq_bridge.py). Each
+# entry opens a PR on its own schedule; CI (.github/workflows/ci.yml) runs
+# against it automatically, so merging it is what ships the update on the
+# next release.
+version: 2
+updates:
+  # The actual Hydro-Québec logic. Checked weekly since a Hydro-Québec portal
+  # change is more likely to require a fresh hydroqc release than the rest of
+  # the stack.
+  - package-ecosystem: 'pip'
+    directory: '/bridge'
+    schedule:
+      interval: 'weekly'
+    labels: ['dependencies', 'hydroqc']
+
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels: ['dependencies']
+
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels: ['dependencies']
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels: ['dependencies']
