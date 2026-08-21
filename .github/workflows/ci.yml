@@ -8,7 +8,7 @@ jobs:
   node:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -21,7 +21,7 @@ jobs:
   bridge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -33,3 +33,17 @@ jobs:
       # something this bridge relies on (WebUser, ContractDCPC/DPC, OutageStatus...)
       # without needing real Hydro-Québec credentials.
       - run: python -c "import sys; sys.path.insert(0, 'bridge'); import hq_bridge; print(sorted(hq_bridge.COMMANDS))"
+
+  docker:
+    # Actually builds the image (single-arch, no push): a Dockerfile-only
+    # change (base image bump, apk/pip package changes...) is invisible to
+    # the "node"/"bridge" jobs above, which never touch Docker at all.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: gladys-hydro-quebec:ci
