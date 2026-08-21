@@ -14,12 +14,44 @@ export const DEFAULT_CONFIG = {
   preheat_duration_minutes: 180, // minutes; must match the manifest's default (hydroqc's own default).
 };
 
+// Must mirror the `min`/`max` declared for each field in the manifest's
+// config_schema: Gladys itself rejects a device with an out-of-range
+// poll_frequency (400 "invalid poll frequency"), so clamping here to the
+// same bounds guarantees we never even attempt to publish a bad value.
+const POLL_FREQUENCY_MIN = 300;
+const POLL_FREQUENCY_MAX = 86400;
+const PREHEAT_DURATION_MIN = 0;
+const PREHEAT_DURATION_MAX = 360;
+
+/**
+ * Parse a config value as a number, falling back to `fallback` when it isn't
+ * a finite number in [min, max]. Deliberately NOT just `value ?? fallback`:
+ * an untouched optional number field on the Configuration screen can come
+ * back as `''` (empty string) rather than `null`/`undefined` - `??` lets
+ * that through, and `Number('')` is `0`, not NaN, so it would silently pass
+ * as "configured" with a useless value instead of falling back.
+ */
+function toBoundedNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
+}
+
 export function normalizeConfig(raw = {}) {
   return {
     ...DEFAULT_CONFIG,
     ...raw,
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    preheat_duration_minutes: Number(raw.preheat_duration_minutes ?? DEFAULT_CONFIG.preheat_duration_minutes),
+    poll_frequency: toBoundedNumber(
+      raw.poll_frequency,
+      DEFAULT_CONFIG.poll_frequency,
+      POLL_FREQUENCY_MIN,
+      POLL_FREQUENCY_MAX,
+    ),
+    preheat_duration_minutes: toBoundedNumber(
+      raw.preheat_duration_minutes,
+      DEFAULT_CONFIG.preheat_duration_minutes,
+      PREHEAT_DURATION_MIN,
+      PREHEAT_DURATION_MAX,
+    ),
   };
 }
 
