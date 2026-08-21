@@ -349,10 +349,6 @@ only the technical conditions that were exercised.
 
 ## Known limitations / follow-ups
 
-- `cover.png` (800×534, ≤150 KB) still needs to be added before this can be
-  submitted to the official Gladys integration store — unrelated to
-  installing/running it via a repo-URL or developer-mode install, both of
-  which work without it.
 - The "average daily cost" feature is the current billing period's average
   $/day (`contract.cp_daily_bill_mean`): Hydro-Québec's API does not expose
   an exact $ figure per individual day for the base "D" rate.
