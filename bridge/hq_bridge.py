@@ -29,6 +29,7 @@ import logging
 import os
 import sys
 import traceback
+from datetime import datetime
 from typing import Any
 
 from hydroqc.contract import ContractDCPC, ContractDPC
@@ -134,6 +135,24 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
     preheat_duration_minutes = params.get("preheat_duration_minutes")
     if preheat_duration_minutes is not None and hasattr(contract, "set_preheat_duration"):
         contract.set_preheat_duration(int(preheat_duration_minutes))
+
+    # hydroqc's HydroClient is shared by every contract under one logged-in
+    # WebUser, and its _select_contract() (called internally by both
+    # get_periods_info() and get_today_daily_consumption() below) only
+    # re-navigates the Hydro-Québec portal to the requested contract when
+    # its *web session* has expired - it does NOT check whether the
+    # currently selected contract is actually this one
+    # (hydro_api/client.py: `if self.web_session_expiry > datetime.now(): return`).
+    # On an account with several contracts (e.g. a secondary meter under the
+    # same subscription), polling contract B shortly after contract A - the
+    # normal case, since pollAllContracts() loops over every contract every
+    # cycle - reuses A's still-fresh web session and silently returns A's
+    # consumption data mislabeled as B's, with no error at all. Forcing the
+    # session stale here whenever the selected contract differs makes
+    # hydroqc actually reselect before fetching this contract's data.
+    hydro_client = contract._hydro_client  # noqa: SLF001 - no public API for this
+    if hydro_client.selected_contract != contract_id:
+        hydro_client.web_session_expiry = datetime.min
 
     await account.get_info()
 
