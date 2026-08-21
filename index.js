@@ -14,23 +14,20 @@
 import { GladysIntegration, logger } from '@gladysassistant/integration-sdk';
 import { normalizeConfig, isConfigured } from './src/config.js';
 import { HydroQcSession } from './src/hydroquebec/session.js';
-import { buildContractDevice, contractDeviceExternalId, pollContractDevice } from './src/devices/contract.js';
+import { buildContractDevice, pollContractDevice } from './src/devices/contract.js';
 
 const gladys = new GladysIntegration();
 
 let config = normalizeConfig();
 let session = null;
-// external_id -> contract descriptor, rebuilt every time devices are (re)published.
-let contractsByExternalId = new Map();
+// Our own refresh loop: Gladys's device.poll_frequency is an enum of fixed
+// 1-60s values meant for fast local devices (see buildContractDevice), so it
+// cannot express "once an hour" and is never set on our devices. Instead we
+// drive polling ourselves at config.poll_frequency and push states directly.
+let pollTimer = null;
 
 function credentialsChanged(previous, next) {
   return previous.username !== next.username || previous.password !== next.password;
-}
-
-function rebuildDeviceIndex() {
-  contractsByExternalId = new Map(
-    (session?.contracts ?? []).map((contract) => [contractDeviceExternalId(gladys, contract.contractId), contract]),
-  );
 }
 
 async function publishDevices() {
@@ -38,14 +35,50 @@ async function publishDevices() {
     await gladys.publishDiscoveredDevices([]);
     return;
   }
-  const devices = session.contracts.map((contract) => buildContractDevice(gladys, contract, config));
-  rebuildDeviceIndex();
+  const devices = session.contracts.map((contract) => buildContractDevice(gladys, contract));
   await gladys.publishDiscoveredDevices(devices);
+}
+
+async function pollAllContracts() {
+  if (!session) return;
+  for (const contract of session.contracts) {
+    try {
+      await pollContractDevice(gladys, session, contract, config);
+    } catch (err) {
+      logger.error(`Poll failed for contract ${contract.contractId}`, err);
+    }
+  }
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function schedulePolling() {
+  stopPolling();
+  if (!session || session.contracts.length === 0) return;
+  pollTimer = setInterval(() => {
+    pollAllContracts()
+      .then(() => gladys.setConnectionStatus(true))
+      .catch((err) => {
+        logger.error('Scheduled poll failed', err);
+        gladys
+          .setConnectionStatus(false, {
+            en: `Hydro-Québec request failed: ${err.message}`,
+            fr: `Échec d’une requête Hydro-Québec : ${err.message}`,
+          })
+          .catch(() => {});
+      });
+  }, config.poll_frequency * 1000);
 }
 
 function replaceSession(newSession) {
   // Each HydroQcSession owns a Python bridge subprocess: stop the old one
   // before dropping the reference, or it would leak as an orphaned process.
+  stopPolling();
   session?.stop();
   session = newSession;
 }
@@ -76,6 +109,10 @@ async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
     return;
   }
 
+  // Publish an initial reading right away instead of waiting a full
+  // poll_frequency for the first data point, then hand off to the interval.
+  await pollAllContracts();
+  schedulePolling();
   await gladys.setConnectionStatus(true);
 }
 
@@ -90,27 +127,6 @@ gladys.onScanRequest(async () => {
       en: `Could not reach Hydro-Québec: ${err.message}`,
       fr: `Impossible de joindre Hydro-Québec : ${err.message}`,
     });
-  }
-});
-
-// --- Polling: Gladys asks to refresh one contract-device ----------------------
-gladys.onPoll(async (device) => {
-  const contract = contractsByExternalId.get(device.external_id);
-  if (!session || !contract) {
-    logger.debug(`onPoll ignored for unknown device ${device.external_id}`);
-    return;
-  }
-  try {
-    await pollContractDevice(gladys, session, contract, config);
-    await gladys.setConnectionStatus(true);
-  } catch (err) {
-    logger.error(`Poll failed for contract ${contract.contractId}`, err);
-    await gladys
-      .setConnectionStatus(false, {
-        en: `Hydro-Québec request failed: ${err.message}`,
-        fr: `Échec d’une requête Hydro-Québec : ${err.message}`,
-      })
-      .catch(() => {});
   }
 });
 
@@ -170,6 +186,7 @@ gladys.on('connected', async () => {
 // --- Graceful shutdown -------------------------------------------------------
 gladys.handleShutdown((signal) => {
   logger.info(`Received ${signal} -> graceful shutdown`);
+  stopPolling();
   session?.stop();
 });
 

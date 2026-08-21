@@ -54,11 +54,7 @@ function contractLabel(contract) {
   return name ? `Hydro-Québec – ${name} (${contract.contractId})` : `Hydro-Québec – ${contract.contractId}`;
 }
 
-export function contractDeviceExternalId(gladys, contractId) {
-  return gladys.externalIds('contract', contractId).device;
-}
-
-export function buildContractDevice(gladys, contract, config) {
+export function buildContractDevice(gladys, contract) {
   const ids = gladys.externalIds('contract', contract.contractId);
   const isCpc = isCpcContract(contract);
   const isDpc = isDpcContract(contract);
@@ -229,7 +225,15 @@ export function buildContractDevice(gladys, contract, config) {
   return {
     name: contractLabel(contract),
     external_id: ids.device,
-    poll_frequency: config.poll_frequency,
+    // Deliberately NOT setting `poll_frequency` here: Gladys's own field by
+    // that name is an enum of 6 fixed millisecond values (1/2/10/15/30/60s -
+    // see DEVICE_POLL_FREQUENCIES in the Gladys server), meant for fast local
+    // devices polled by the core's own scheduler. It cannot express "once an
+    // hour", and setting it to anything else is rejected outright ("invalid
+    // poll frequency"). `config.poll_frequency` (seconds, 300-86400) is a
+    // completely different, integration-owned setting: index.js drives its
+    // own setInterval with it and pushes states via publishStates() directly,
+    // never going through Gladys's per-device poll mechanism at all.
     params: [
       { name: 'contract_id', value: contract.contractId },
       { name: 'account_id', value: contract.accountId },

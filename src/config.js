@@ -15,9 +15,10 @@ export const DEFAULT_CONFIG = {
 };
 
 // Must mirror the `min`/`max` declared for each field in the manifest's
-// config_schema: Gladys itself rejects a device with an out-of-range
-// poll_frequency (400 "invalid poll frequency"), so clamping here to the
-// same bounds guarantees we never even attempt to publish a bad value.
+// config_schema. This poll_frequency is entirely our own concept (seconds
+// between Hydro-Québec refreshes, driven by our own setInterval in index.js)
+// - it is never forwarded to Gladys's `device.poll_frequency`, which is an
+// unrelated enum of fixed 1-60s values for fast local devices.
 const POLL_FREQUENCY_MIN = 300;
 const POLL_FREQUENCY_MAX = 86400;
 const PREHEAT_DURATION_MIN = 0;
