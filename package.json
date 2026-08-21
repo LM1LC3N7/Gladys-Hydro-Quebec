@@ -1,6 +1,6 @@
 {
   "name": "gladys-hydro-quebec",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "External integration for Gladys Assistant that connects Hydro-Québec accounts (consumption, Winter Credit / CPC and Flex D / DPC peaks, outages).",
   "type": "module",
