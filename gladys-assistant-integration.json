@@ -6,16 +6,12 @@
     "en": "Hydro-Québec electricity consumption, Winter Credit and Flex D peaks, billing and outages.",
     "fr": "Consommation Hydro-Québec, pointes Crédit Hivernal et Flex D, facturation et pannes."
   },
-  "version": "0.1.3",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.3",
+  "version": "0.1.4",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.4",
   "gladys_version": ">=4.86.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/main/cover.png",
-  "categories": [
-    "energy"
-  ],
-  "transports": [
-    "cloud"
-  ],
+  "categories": ["energy"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",

@@ -136,7 +136,20 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         contract.set_preheat_duration(int(preheat_duration_minutes))
 
     await account.get_info()
-    await contract.get_periods_info()
+
+    # Some contracts (e.g. a newly opened service, or a secondary/water-heater
+    # meter) have no current billing period yet on Hydro-Québec's side -
+    # get_periods_info() then raises HydroQcError("No period found..."). That
+    # must not take down the whole poll: consumption, temperature, balance
+    # and outage status below are all independent of period data. Only the
+    # daily cost mean (which is derived from the current period) is skipped.
+    daily_cost_mean = None
+    try:
+        await contract.get_periods_info()
+        daily_cost_mean = contract.cp_daily_bill_mean
+    except HydroQcError as exc:
+        logger.warning("No billing period data for contract %s (%s), daily cost unavailable", contract_id, exc)
+
     daily = await contract.get_today_daily_consumption()
     await contract.refresh_outages()
 
@@ -149,7 +162,7 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         "balance": account.balance,
         "daily_consumption_kwh": daily_today.get("consoTotalQuot"),
         "avg_temperature": daily_today.get("tempMoyenneQuot"),
-        "daily_cost_mean": contract.cp_daily_bill_mean,
+        "daily_cost_mean": daily_cost_mean,
         "outage_active": any(o.status in ACTIVE_OUTAGE_STATUSES for o in contract.outages),
         "cpc": None,
         "dpc": None,
