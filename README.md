@@ -287,29 +287,80 @@ including an import-only smoke test of `bridge/hq_bridge.py` against the new
 needing real Hydro-Québec credentials). Merging that PR and cutting a release
 is what actually ships the update.
 
+## What's confirmed working
+
+Everything below has been validated against a **real Hydro-Québec account**
+and a **real Gladys instance** (not just unit tests or a read of the
+`hydroqc` source) — through the 0.1.0 → 0.1.5 releases, each one shipped to
+fix something a real install/poll cycle actually hit. No account numbers,
+names, or addresses appear here or anywhere else in this repo's history —
+only the technical conditions that were exercised.
+
+- **Install path**: "Install from GitHub" (repo-URL mode) end to end —
+  manifest validation, `docker_image` resolution from GitHub's reported
+  default branch, and pulling the built image from `ghcr.io`.
+- **Release pipeline**: `.github/workflows/release.yml` has cut multiple real
+  releases — version bump, git tag, GitHub Release, and a multi-arch
+  (amd64+arm64) `docker buildx` build actually pushed to `ghcr.io`. Not a
+  theoretical CI job: Gladys has pulled and run each of these images.
+  Also confirmed: the bump commit reaching _every_ branch a repo-URL install
+  might resolve as "default", not just the one the workflow was dispatched
+  against (see `release.yml`'s own comment on that step).
+- **Login**: the real Azure AD B2C / PKCE flow, both through the
+  Configuration screen's **Test the connection** action and through
+  `discover`.
+- **Discovery on a multi-contract account**: one Hydro-Québec subscription
+  with **two meters** (a primary contract and a secondary one sharing the
+  same billing account) — both surfaced as separate Gladys devices with
+  distinct, correct data. This is also what exposed and confirmed the fix
+  for the `hydroqc` session cross-contract data leak (see `hq_bridge.py`,
+  0.1.5): before that fix, the second contract polled in a cycle silently
+  reported the first contract's consumption figures.
+- **Adding a discovered device** from the Discovery screen, with all its
+  features accepted by Gladys (the `t_device_feature` NOT NULL `min`/`max`
+  constraint on every feature — including binary/text ones — fixed in
+  0.1.3).
+- **Polling**: the integration's own `setInterval`-driven refresh loop
+  (`index.js`, not Gladys's `device.poll_frequency`, which is a fixed
+  1-60s enum incompatible with hourly polling — see 0.1.2) publishing an
+  immediate reading after config save and then on every interval after.
+- **A contract with no current billing period** (a secondary meter with
+  no period data yet on Hydro-Québec's side): confirmed the poll no longer
+  aborts entirely — consumption, temperature, balance and outage status
+  still publish; only the period-derived daily cost is omitted (0.1.4).
+- **Base "D" rate** consumption, average outdoor temperature, account
+  balance, and the outage sensor: all confirmed populated with real,
+  correct values across repeated poll cycles.
+- **Docker-in-LXC deployment** (Proxmox, unprivileged Alpine LXC container
+  running Docker): confirmed working once the host's cgroup v2 delegation
+  is set up correctly (an Alpine/OpenRC-specific `cgroup.subtree_control`
+  quirk, not something this integration's image can fix on its own).
+
+### Not yet independently confirmed
+
+- **Winter Credit (CPC) and Flex D (DPC)** peak-event features (state,
+  cumulated/projected credit, critical hours, pre-heat) are implemented
+  directly against `hydroqc`'s own already-computed properties, the same
+  ones `hydroqc-ha` (the Home Assistant integration) relies on — but no
+  account enrolled in either dynamic rate option has polled this
+  integration yet, so their real values haven't been eyeballed end to end.
+- Hourly consumption and the CSV export endpoints (`hydroqc` supports both)
+  are not wired up at all yet — only daily/period consumption is.
+
 ## Known limitations / follow-ups
 
-- Hourly consumption and the CSV export endpoints (`hydroqc` supports both)
-  are not wired up yet — daily/period consumption and the CPC/DPC endpoints
-  are.
+- `cover.png` (800×534, ≤150 KB) still needs to be added before this can be
+  submitted to the official Gladys integration store — unrelated to
+  installing/running it via a repo-URL or developer-mode install, both of
+  which work without it.
 - The "average daily cost" feature is the current billing period's average
   $/day (`contract.cp_daily_bill_mean`): Hydro-Québec's API does not expose
   an exact $ figure per individual day for the base "D" rate.
-- `cover.png` (800×534, ≤150 KB) still needs to be added before this can be
-  submitted to the Gladys integration store. `.github/workflows/release.yml`
-  (multi-arch build to `ghcr.io`) exists but has never been run in this
-  environment (no Docker daemon here) — see its header comment for the two
-  one-time manual GitHub settings it depends on (workflow permissions, GHCR
-  package visibility).
-- GitHub's own "default branch" setting for this repo may not point at
-  `main` — `installFromRepoUrl` (the "Install from GitHub" screen) resolves
-  the manifest from whatever GitHub reports as the default branch via its
-  API, not necessarily `main`. Check/set it under Settings -> Branches if a
-  repo-URL install doesn't pick up recent manifest changes.
-- The Docker build itself (see "Image size and attack surface" above) has not
-  been verified end-to-end against a real Docker daemon in this environment —
-  wheel availability was checked directly against PyPI, but a real
-  `docker build` + a real login should still happen before a first release.
+- The cross-contract session fix in `hq_bridge.py` (0.1.5) reaches into a
+  private (`_`-prefixed) `hydroqc` attribute because there is no public API
+  for "reselect this contract" — flagged in that code's own comment as
+  something to revisit if a future `hydroqc` release changes that
+  internal's shape or fixes the underlying selection bug upstream.
 - `hydroqc`'s own disclaimer applies here too: this is a non-official way to
   access Hydro-Québec's data, and it can break whenever Hydro-Québec changes
   its portal.

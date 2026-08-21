@@ -44,6 +44,32 @@ gain/la perte par rapport au tarif de base.
 - **Tester la connexion** — tente une vraie connexion à Hydro-Québec et
   affiche le succès ou la raison exacte de l'échec sous le bouton.
 
+## Testé et confirmé fonctionnel
+
+Cette intégration a été validée avec un vrai compte Hydro-Québec et une
+vraie instance Gladys, pas seulement des tests automatisés :
+
+- La connexion, la découverte des contrats, et l'ajout d'un appareil découvert
+  depuis l'onglet Découverte.
+- Un compte avec **plus d'un compteur sous le même abonnement** (un contrat
+  principal et un secondaire) — chacun rapportant correctement ses propres
+  données distinctes.
+- La boucle de rafraîchissement, y compris le premier relevé qui apparaît
+  juste après l'enregistrement de la configuration.
+- Un contrat sans période de facturation en cours côté Hydro-Québec (ex. un
+  compteur secondaire ou récemment ajouté) : la consommation, la
+  température, le solde et l'état des pannes continuent d'être publiés,
+  seul le coût quotidien reste vide pour celui-ci.
+- La consommation, la température, le solde et les pannes au tarif de base
+  « D », sur plusieurs cycles de rafraîchissement successifs.
+
+**Pas encore confirmé de façon indépendante** : les valeurs des pointes
+Crédit Hivernal (CPC) et Flex D (DPC) sont calculées directement à partir
+des mêmes valeurs déjà calculées qu'utilise l'intégration Home Assistant
+pour Hydro-Québec, mais aucun compte inscrit à l'une de ces options n'a
+encore utilisé cette intégration — si c'est votre cas et que quelque chose
+semble incorrect, merci d'ouvrir une issue.
+
 ## Notes importantes
 
 - Cette intégration est développée de façon indépendante et **n'est pas

@@ -43,6 +43,30 @@ savings/loss compared to the base rate.
 - **Test the connection** — attempts a real login to Hydro-Québec and reports
   success or the exact failure reason under the button.
 
+## Tested and confirmed working
+
+This integration has been validated against a real Hydro-Québec account and
+a real Gladys instance, not just automated tests:
+
+- Login, contract discovery, and adding a discovered device from the
+  Discovery tab.
+- An account with **more than one meter under the same subscription**
+  (a primary contract and a secondary one) — both correctly reporting their
+  own, distinct data.
+- The refresh loop, including the first reading appearing right after saving
+  the configuration.
+- A contract with no current billing period yet on Hydro-Québec's side (e.g.
+  a newly added or secondary meter): consumption, temperature, balance and
+  outage status still come through, only the daily cost is left blank for it.
+- Base "D" rate consumption, temperature, balance and outage figures, over
+  repeated refresh cycles.
+
+**Not yet independently confirmed**: the Winter Credit (CPC) and Flex D
+(DPC) peak-event figures are implemented directly against the same
+already-computed values the Home Assistant Hydro-Québec integration uses,
+but no account enrolled in either option has used this integration yet —
+if you are and something looks off, please open an issue.
+
 ## Important notes
 
 - This integration is developed independently and is **not supported by
