@@ -120,6 +120,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read the manifest for the image label
+        id: manifest
+        run: |
+          # Gladys reads the manifest from the io.gladysassistant.manifest
+          # image label for a "dev install by image name" (Developer mode
+          # without a GitHub repo) and for "Force update" of such an install:
+          # embed it here (gladys-assistant-integration.json on disk was
+          # already bumped to this release's version/docker_image above) so
+          # config schema / actions / containers changes ship with the image.
+          set -euo pipefail
+          manifest="$(jq -c . gladys-assistant-integration.json)"
+          {
+            echo "json<<MANIFEST_EOF"
+            echo "$manifest"
+            echo "MANIFEST_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -128,3 +145,5 @@ jobs:
           tags: |
             ${{ steps.image.outputs.name }}:${{ steps.bump.outputs.version }}
             ${{ steps.image.outputs.name }}:latest
+          labels: |
+            io.gladysassistant.manifest=${{ steps.manifest.outputs.json }}

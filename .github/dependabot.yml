@@ -4,6 +4,12 @@
 # entry opens a PR on its own schedule; CI (.github/workflows/ci.yml) runs
 # against it automatically, so merging it is what ships the update on the
 # next release.
+#
+# `target-branch: main` is pinned defensively on every entry: without it,
+# Dependabot targets whatever the repo's GitHub "default branch" setting
+# says, and that setting drifting away from `main` is exactly what broke the
+# 0.1.1 release (see release.yml's multi-branch push comment) — pinning it
+# here means a repeat of that drift can no longer misdirect Dependabot too.
 version: 2
 updates:
   # The actual Hydro-Québec logic. Checked weekly since a Hydro-Québec portal
@@ -11,24 +17,28 @@ updates:
   # the stack.
   - package-ecosystem: 'pip'
     directory: '/bridge'
+    target-branch: 'main'
     schedule:
       interval: 'weekly'
     labels: ['dependencies', 'hydroqc']
 
   - package-ecosystem: 'npm'
     directory: '/'
+    target-branch: 'main'
     schedule:
       interval: 'weekly'
     labels: ['dependencies']
 
   - package-ecosystem: 'docker'
     directory: '/'
+    target-branch: 'main'
     schedule:
       interval: 'weekly'
     labels: ['dependencies']
 
   - package-ecosystem: 'github-actions'
     directory: '/'
+    target-branch: 'main'
     schedule:
       interval: 'weekly'
     labels: ['dependencies']
