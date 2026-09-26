@@ -75,6 +75,15 @@ jobs:
             pkg.version = '${{ steps.bump.outputs.version }}';
             fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           "
+
+          # JSON.stringify always multi-lines every array regardless of
+          # length, which disagrees with Prettier's style (a short array
+          # like `categories`/`transports` collapses to one line) -
+          # reformat back to that style so this commit doesn't leave main
+          # failing `npm run format:check` for every PR opened afterwards,
+          # whether or not they touch this file.
+          npx --yes prettier --write gladys-assistant-integration.json
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add gladys-assistant-integration.json package.json
