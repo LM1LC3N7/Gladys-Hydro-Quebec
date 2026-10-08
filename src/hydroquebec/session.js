@@ -32,13 +32,14 @@ function toContractDescriptor(raw) {
 }
 
 export class HydroQcSession {
-  constructor(username, password, logger, { scriptPath = BRIDGE_SCRIPT_PATH } = {}) {
+  constructor(username, password, logger, { scriptPath = BRIDGE_SCRIPT_PATH, pythonExecutable } = {}) {
     this.username = username;
     this.password = password;
     this.logger = logger;
-    this.bridge = new PythonBridge({ logger, scriptPath });
+    this.bridge = new PythonBridge({ logger, scriptPath, pythonExecutable });
     this.contracts = [];
     this._contractsFetchedAt = 0;
+    this._contractsBridgeGeneration = 0;
   }
 
   /** Test the credentials without needing a full discovery pass. */
@@ -47,9 +48,17 @@ export class HydroQcSession {
     return true;
   }
 
+  /**
+   * Run discovery when forced, when the cached list is older than the TTL, or
+   * when the bridge process was restarted since the last discovery (a crashed
+   * and respawned Python process has lost its contract cache, and would
+   * answer every `poll` with "Unknown contract" until discovery runs again).
+   * Replaces `this.contracts` with a new array only when discovery ran.
+   */
   async ensureContracts(force = false) {
     const stale = Date.now() - this._contractsFetchedAt > DISCOVERY_TTL_MS;
-    if (!force && !stale && this.contracts.length > 0) return this.contracts;
+    const bridgeRestarted = this.bridge.hasRestartedSince(this._contractsBridgeGeneration);
+    if (!force && !stale && !bridgeRestarted && this.contracts.length > 0) return this.contracts;
     const raw = await this.bridge.call(
       'discover',
       { username: this.username, password: this.password },
@@ -57,6 +66,7 @@ export class HydroQcSession {
     );
     this.contracts = raw.map(toContractDescriptor);
     this._contractsFetchedAt = Date.now();
+    this._contractsBridgeGeneration = this.bridge.generation;
     return this.contracts;
   }
 

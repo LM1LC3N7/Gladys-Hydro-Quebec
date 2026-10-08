@@ -39,15 +39,33 @@ async function publishDevices() {
   await gladys.publishDiscoveredDevices(devices);
 }
 
+/**
+ * Refresh every contract. One failing contract does not stop the others, but
+ * when ALL of them fail (Hydro-Québec down, password changed, session broken)
+ * the last error is thrown so the caller can flag the connection as down
+ * instead of reporting "connected" while no data comes in.
+ */
 async function pollAllContracts() {
   if (!session) return;
+
+  // Re-runs discovery once its TTL has expired or after the Python bridge was
+  // restarted (see HydroQcSession.ensureContracts); a no-op otherwise.
+  const previousContracts = session.contracts;
+  await session.ensureContracts();
+  if (session.contracts !== previousContracts) await publishDevices();
+
+  let lastError = null;
+  let failures = 0;
   for (const contract of session.contracts) {
     try {
       await pollContractDevice(gladys, session, contract, config);
     } catch (err) {
+      failures += 1;
+      lastError = err;
       logger.error(`Poll failed for contract ${contract.contractId}`, err);
     }
   }
+  if (failures > 0 && failures === session.contracts.length) throw lastError;
 }
 
 function stopPolling() {
@@ -109,10 +127,13 @@ async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
     return;
   }
 
-  // Publish an initial reading right away instead of waiting a full
-  // poll_frequency for the first data point, then hand off to the interval.
-  await pollAllContracts();
+  // Arm the interval first, so a failing initial reading (thrown to the
+  // caller, which reports it) is still retried on the next tick instead of
+  // leaving the integration idle until the next config save or reconnection.
   schedulePolling();
+  // Publish an initial reading right away instead of waiting a full
+  // poll_frequency for the first data point.
+  await pollAllContracts();
   await gladys.setConnectionStatus(true);
 }
 

@@ -81,6 +81,13 @@ if you are and something looks off, please open an issue.
 
 ## Troubleshooting
 
+The connection status shown on the Configuration screen turns red, with the
+reason, when **every** contract on the account failed its last refresh
+(Hydro-Québec unreachable, password changed...). It turns green again on its
+own at the next successful refresh: there is no need to save the
+configuration again. A single failing contract on a multi-contract account is
+only reported in the logs.
+
 Check the integration logs from the Gladys UI (or `docker logs` on the host)
 with `LOG_LEVEL=debug` for the full detail of every request made to
 Hydro-Québec.

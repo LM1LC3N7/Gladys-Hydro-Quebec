@@ -167,6 +167,14 @@ All three Python↔Node calls are serialized (an `asyncio.Lock` in
 portal, token refresh state), so two commands running at once could corrupt
 each other's session.
 
+The Python process keeps its login and discovered contracts **in memory
+only**. If it dies (crash, OOM kill...), the next call respawns it, and the
+next refresh cycle notices the new process (`PythonBridge.generation`) and
+re-runs discovery before polling — otherwise every `poll` would be answered
+with "Unknown contract ... call discover first" until the next restart of
+the integration. Discovery is also re-run every 6 hours to pick up a contract
+added to or removed from the account.
+
 ## Image size and attack surface
 
 The `Dockerfile` is a 3-stage build specifically to keep the final image
@@ -241,7 +249,8 @@ python -m py_compile bridge/hq_bridge.py    # Python: syntax + import check
 ```
 
 `npm test` covers the Node-side plumbing only (`PythonBridge`'s request/
-response correlation, against a fake bridge process in `test-fixtures/`) —
+response correlation and crash handling, and `HydroQcSession` re-discovering
+after a bridge restart, against fake bridge processes in `test-fixtures/`) —
 it deliberately does **not** re-test `hydroqc`'s own login flow or peak math;
 that's upstream's job, and upstream already has its own test suite.
 
@@ -279,8 +288,12 @@ docker run --rm -it --entrypoint sh gladys-hydro-quebec:dev
 `bridge/requirements.txt` pins an exact `Hydro-Quebec-API-Wrapper` version
 (reproducible builds; an untested upstream release should never silently
 change production behavior). [`.github/dependabot.yml`](.github/dependabot.yml)
-opens a PR bumping that pin — and the npm deps, the `node:24-alpine` base
-image, and GitHub Actions versions — on a weekly schedule;
+opens a PR bumping that pin — and the npm deps (dev tooling grouped in one
+PR), minor/patch updates of the `node:24-alpine` base image, and GitHub
+Actions versions — on a weekly schedule. Node.js **major** bumps of the base
+image are deliberately left out (odd majors are short-lived non-LTS releases)
+and done by hand from one LTS to the next, together with `ci.yml`'s
+`node-version` and `package.json`'s `engines`;
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every PR,
 including an import-only smoke test of `bridge/hq_bridge.py` against the new
 `hydroqc` version (catches a renamed/removed class or property without

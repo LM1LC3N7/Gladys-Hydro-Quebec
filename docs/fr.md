@@ -85,6 +85,13 @@ semble incorrect, merci d'ouvrir une issue.
 
 ## Dépannage
 
+Le statut de connexion affiché dans l'écran de configuration passe au rouge,
+avec la raison, lorsque **tous** les contrats du compte ont échoué à leur
+dernier rafraîchissement (Hydro-Québec injoignable, mot de passe changé...).
+Il redevient vert de lui-même au prochain rafraîchissement réussi : inutile
+de réenregistrer la configuration. Un seul contrat en échec sur un compte qui
+en a plusieurs n'est signalé que dans les logs.
+
 Consultez les logs de l'intégration depuis l'interface Gladys (ou
 `docker logs` sur l'hôte) avec `LOG_LEVEL=debug` pour le détail complet de
 chaque requête envoyée à Hydro-Québec.
