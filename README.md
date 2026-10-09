@@ -78,14 +78,20 @@ code has to change.
 ├─ src/
 │  ├─ config.js                   # Config schema defaults/normalization
 │  ├─ devices/
-│  │  └─ contract.js              # One Gladys device per Hydro-Québec contract
+│  │  ├─ contract.js              # One Gladys device per Hydro-Québec contract, its states
+│  │  └─ statePublisher.js        # Publishes only changed values / newer days
 │  └─ hydroquebec/
 │     ├─ pythonBridge.js          # Spawns bridge/hq_bridge.py, JSON-line request/response
 │     ├─ session.js               # snake_case (Python) -> camelCase (JS) translation
-│     └─ discovery.js             # isCpcContract/isDpcContract: pure helpers, no I/O
+│     ├─ discovery.js             # isCpcContract/isDpcContract: pure helpers, no I/O
+│     ├─ peakMonitor.js           # Peak reading -> features, scene events, timers
+│     ├─ peakTracker.js           # Peak transitions -> scene events (announced, pre-heat...)
+│     └─ peakScheduler.js         # Exact-time transition timers + announcement checks
 ├─ bridge/
 │  ├─ hq_bridge.py                # The actual adapter over `hydroqc` (see its docstring)
-│  └─ requirements.txt            # Pinned `Hydro-Quebec-API-Wrapper` version
+│  ├─ requirements.txt            # Pinned `Hydro-Quebec-API-Wrapper` version
+│  ├─ requirements-dev.txt        # + pytest, ruff (CI/local only, not in the image)
+│  └─ tests/                      # pytest suite against real hydroqc objects
 ├─ docs/{en,fr}.md                # User-facing documentation (required by the Gladys store)
 ├─ gladys-assistant-integration.json  # Manifest: config_schema, categories, docker image
 └─ Dockerfile                     # node:24-alpine + a Python venv for hydroqc
@@ -144,6 +150,7 @@ One JSON object per line, both ways. Node → Python:
 ```json
 {"id": 1, "cmd": "discover", "username": "...", "password": "..."}
 {"id": 2, "cmd": "poll", "contract_id": "0123456789"}
+{"id": 3, "cmd": "peaks", "contract_id": "0123456789", "refresh_open_data": true}
 ```
 
 Python → Node:
@@ -161,11 +168,36 @@ already-computed `hydroqc` properties for one contract — `contract.balance`,
 `contract.critical_called_hours`... — there is no Hydro-Québec-specific
 parsing left in this repo, only field renaming.
 
-All three Python↔Node calls are serialized (an `asyncio.Lock` in
+`peaks` is the lightweight one: it re-evaluates a Winter Credit / Flex D
+contract's peak state (current state, pre-heat, upcoming critical peaks)
+from data the bridge already holds, without any portal request —
+`refresh_open_data` adds one request to Hydro-Québec's public,
+unauthenticated feed of announced peak events. Node calls it at the exact
+instants a pre-heat or a critical peak starts or ends (timers armed from the
+schedule every reading returns, `src/hydroquebec/peakScheduler.js`), and
+every 15 minutes from 10:30 to 15:00 Eastern time, when Hydro-Québec
+announces the next day's peaks. The transitions are also published as Gladys
+scene events (`scene_triggers` in the manifest, `peakTracker.js`).
+
+**Time zone.** `hydroqc` reads "now" as the system's local wall clock
+labelled as Eastern time (`hydroqc.utils.now()`). Left on UTC — the Docker
+default — every peak state was 4 hours off (5 in winter). `hq_bridge.py`
+therefore pins its own process to Eastern time (`TZ=EST5EDT,...`, a POSIX
+string: the Alpine image has no tzdata) before importing `hydroqc`.
+
+All the Python↔Node calls are serialized (an `asyncio.Lock` in
 `hq_bridge.py`): every contract under one login shares the same underlying
 `hydroqc` HTTP client (cookies, the "currently selected contract" on the
 portal, token refresh state), so two commands running at once could corrupt
 each other's session.
+
+The Python process keeps its login and discovered contracts **in memory
+only**. If it dies (crash, OOM kill...), the next call respawns it, and the
+next refresh cycle notices the new process (`PythonBridge.generation`) and
+re-runs discovery before polling — otherwise every `poll` would be answered
+with "Unknown contract ... call discover first" until the next restart of
+the integration. Discovery is also re-run every 6 hours to pick up a contract
+added to or removed from the account.
 
 ## Image size and attack surface
 
@@ -236,14 +268,21 @@ Checks:
 ```bash
 npm run lint
 npm run format:check
-npm test                                    # Node: protocol/plumbing tests
-python -m py_compile bridge/hq_bridge.py    # Python: syntax + import check
+npm test                                    # Node: plumbing, states, peak timing/events
+pip install -r bridge/requirements-dev.txt  # (in the venv above)
+ruff check bridge                           # Python lint
+TZ=UTC python -m pytest -q bridge/tests     # Python: bridge against real hydroqc objects
+npx --yes github:GladysAssistant/integration-store .   # Gladys store manifest checks
 ```
 
-`npm test` covers the Node-side plumbing only (`PythonBridge`'s request/
-response correlation, against a fake bridge process in `test-fixtures/`) —
-it deliberately does **not** re-test `hydroqc`'s own login flow or peak math;
-that's upstream's job, and upstream already has its own test suite.
+`npm test` covers the Node side (`PythonBridge`'s request/response
+correlation and crash handling, `HydroQcSession` re-discovering after a
+bridge restart against fake bridge processes in `test-fixtures/`, the state
+publishing, and the peak timers and scene events). `bridge/tests` covers what
+`hq_bridge.py` adds on top of `hydroqc` (dated consumption, pre-heat before
+critical peaks only, peak schedule, the Eastern-time clock) with real
+`hydroqc` peak handlers fed an open-data payload and a pinned clock. Neither
+re-tests `hydroqc`'s own login flow or peak math; that's upstream's job.
 
 ### Testing the built image against a real Hydro-Québec account
 
@@ -279,8 +318,12 @@ docker run --rm -it --entrypoint sh gladys-hydro-quebec:dev
 `bridge/requirements.txt` pins an exact `Hydro-Quebec-API-Wrapper` version
 (reproducible builds; an untested upstream release should never silently
 change production behavior). [`.github/dependabot.yml`](.github/dependabot.yml)
-opens a PR bumping that pin — and the npm deps, the `node:24-alpine` base
-image, and GitHub Actions versions — on a weekly schedule;
+opens a PR bumping that pin — and the npm deps (dev tooling grouped in one
+PR), minor/patch updates of the `node:24-alpine` base image, and GitHub
+Actions versions — on a weekly schedule. Node.js **major** bumps of the base
+image are deliberately left out (odd majors are short-lived non-LTS releases)
+and done by hand from one LTS to the next, together with `ci.yml`'s
+`node-version` and `package.json`'s `engines`;
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every PR,
 including an import-only smoke test of `bridge/hq_bridge.py` against the new
 `hydroqc` version (catches a renamed/removed class or property without
@@ -344,10 +387,23 @@ only the technical conditions that were exercised.
   ones `hydroqc-ha` (the Home Assistant integration) relies on — but no
   account enrolled in either dynamic rate option has polled this
   integration yet, so their real values haven't been eyeballed end to end.
+  The exact-time transitions, the scene triggers (Gladys 5.1+), the
+  Eastern-time clock fix and the "pre-heat before critical peaks only" rule
+  are unit-tested against real `hydroqc` objects, not yet on a real account.
+- The **date** Hydro-Québec gives a daily consumption figure
+  (`dateJourConso`, used to file it under the day it measures) is parsed as
+  `YYYY-MM-DD…`; if a real payload ever differs, the figure is published
+  without a date (once per value change) and a regression shows up as
+  missing history, not as wrong data.
 - Hourly consumption and the CSV export endpoints (`hydroqc` supports both)
   are not wired up at all yet — only daily/period consumption is.
 
 ## Known limitations / follow-ups
+
+- Upgrading from 0.1.x: the daily consumption used to be stored with the time
+  of each poll. The first one or two days after the upgrade may be skipped,
+  until a day newer than the last value stored by the previous version comes
+  in.
 
 - The "average daily cost" feature is the current billing period's average
   $/day (`contract.cp_daily_bill_mean`): Hydro-Québec's API does not expose

@@ -15,11 +15,17 @@ import { GladysIntegration, logger } from '@gladysassistant/integration-sdk';
 import { normalizeConfig, isConfigured } from './src/config.js';
 import { HydroQcSession } from './src/hydroquebec/session.js';
 import { buildContractDevice, pollContractDevice } from './src/devices/contract.js';
+import { StatePublisher } from './src/devices/statePublisher.js';
+import { PeakMonitor } from './src/hydroquebec/peakMonitor.js';
 
 const gladys = new GladysIntegration();
 
 let config = normalizeConfig();
 let session = null;
+// Publishes only the states that changed (no duplicate history points).
+const publisher = new StatePublisher();
+// Winter Credit / Flex D: exact-time peak transitions and scene events.
+const peakMonitor = new PeakMonitor({ gladys, publisher, logger, context: () => ({ session, config }) });
 // Our own refresh loop: Gladys's device.poll_frequency is an enum of fixed
 // 1-60s values meant for fast local devices (see buildContractDevice), so it
 // cannot express "once an hour" and is never set on our devices. Instead we
@@ -39,15 +45,34 @@ async function publishDevices() {
   await gladys.publishDiscoveredDevices(devices);
 }
 
+/**
+ * Refresh every contract. One failing contract does not stop the others, but
+ * when ALL of them fail (Hydro-Québec down, password changed, session broken)
+ * the last error is thrown so the caller can flag the connection as down
+ * instead of reporting "connected" while no data comes in.
+ */
 async function pollAllContracts() {
   if (!session) return;
+
+  // Re-runs discovery once its TTL has expired or after the Python bridge was
+  // restarted (see HydroQcSession.ensureContracts); a no-op otherwise.
+  const previousContracts = session.contracts;
+  await session.ensureContracts();
+  if (session.contracts !== previousContracts) await publishDevices();
+
+  let lastError = null;
+  let failures = 0;
   for (const contract of session.contracts) {
     try {
-      await pollContractDevice(gladys, session, contract, config);
+      const snapshot = await pollContractDevice(gladys, session, contract, config, publisher);
+      await peakMonitor.handle(contract, snapshot);
     } catch (err) {
+      failures += 1;
+      lastError = err;
       logger.error(`Poll failed for contract ${contract.contractId}`, err);
     }
   }
+  if (failures > 0 && failures === session.contracts.length) throw lastError;
 }
 
 function stopPolling() {
@@ -55,11 +80,13 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  peakMonitor.stop();
 }
 
 function schedulePolling() {
   stopPolling();
   if (!session || session.contracts.length === 0) return;
+  peakMonitor.start(session.contracts);
   pollTimer = setInterval(() => {
     pollAllContracts()
       .then(() => gladys.setConnectionStatus(true))
@@ -109,10 +136,13 @@ async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
     return;
   }
 
-  // Publish an initial reading right away instead of waiting a full
-  // poll_frequency for the first data point, then hand off to the interval.
-  await pollAllContracts();
+  // Arm the interval first, so a failing initial reading (thrown to the
+  // caller, which reports it) is still retried on the next tick instead of
+  // leaving the integration idle until the next config save or reconnection.
   schedulePolling();
+  // Publish an initial reading right away instead of waiting a full
+  // poll_frequency for the first data point.
+  await pollAllContracts();
   await gladys.setConnectionStatus(true);
 }
 
@@ -170,6 +200,9 @@ gladys.onConfigUpdated(async (newConfig) => {
 // --- Connection lifecycle ----------------------------------------------------
 gladys.on('connected', async () => {
   try {
+    // gladys.devices was just resynchronized: remember what Gladys already
+    // has, so unchanged values and already-stored days are not republished.
+    publisher.seed(gladys.devices);
     config = normalizeConfig(await gladys.getConfig());
     await refreshFromHydroQuebec({ forceDiscovery: false });
   } catch (err) {
@@ -181,6 +214,13 @@ gladys.on('connected', async () => {
       })
       .catch(() => {});
   }
+});
+
+// --- A discovered device was added by the user ----------------------------------
+// Its features start empty: forget what was published for them so the next
+// refresh fills them even if the values did not change since.
+gladys.onDeviceCreated(async (device) => {
+  publisher.forget((device.features ?? []).map((feature) => feature.external_id));
 });
 
 // --- Graceful shutdown -------------------------------------------------------

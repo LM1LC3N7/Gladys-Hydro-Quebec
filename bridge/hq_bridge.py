@@ -28,14 +28,26 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 from datetime import datetime
 from typing import Any
 
-from hydroqc.contract import ContractDCPC, ContractDPC
-from hydroqc.error import HydroQcError
-from hydroqc.types import OutageStatus
-from hydroqc.webuser import WebUser
+# hydroqc computes "now" as the system's LOCAL wall clock labelled as Eastern
+# time (hydroqc.utils.now: EST_TIMEZONE.localize(datetime.now())). In a
+# container left on UTC - the Docker default - every peak state, pre-heat
+# window and "today/tomorrow" lookup was therefore 4 hours off (5 in winter).
+# Pin this process to Eastern time before anything reads the clock. A POSIX TZ
+# string, not "America/Toronto": the Alpine image ships no tzdata database,
+# and musl/glibc both understand this form without one.
+os.environ["TZ"] = "EST5EDT,M3.2.0,M11.1.0"
+time.tzset()
+
+from hydroqc import utils as hq_utils  # noqa: E402 - must follow the TZ pin above
+from hydroqc.contract import ContractDCPC, ContractDPC  # noqa: E402
+from hydroqc.error import HydroQcError  # noqa: E402
+from hydroqc.types import OutageStatus  # noqa: E402
+from hydroqc.webuser import WebUser  # noqa: E402
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -47,6 +59,10 @@ logger = logging.getLogger("hq_bridge")
 # Outage states considered "in progress" for the power_outage sensor. hydroqc
 # does not document these HQ-internal codes further than the enum names below.
 ACTIVE_OUTAGE_STATUSES = {OutageStatus.courante_confirme, OutageStatus.non_confirme}
+
+# Upper bound on the upcoming critical peaks returned per contract: a winter
+# has at most ~30 critical events (120 h of Flex D peaks, 4 h each).
+MAX_SCHEDULED_PEAKS = 40
 
 
 class BridgeState:
@@ -125,16 +141,111 @@ async def cmd_discover(params: dict[str, Any]) -> list[dict[str, Any]]:
     return contracts
 
 
-async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
+def get_contract_entry(params: dict[str, Any]) -> tuple[Any, Any, Any]:
     contract_id = params["contract_id"]
     entry = state.contracts_by_id.get(contract_id)
     if entry is None:
         raise HydroQcError(f"Unknown contract {contract_id}: call discover first")
-    contract, account, _customer = entry
-
+    contract = entry[0]
     preheat_duration_minutes = params.get("preheat_duration_minutes")
     if preheat_duration_minutes is not None and hasattr(contract, "set_preheat_duration"):
         contract.set_preheat_duration(int(preheat_duration_minutes))
+    return entry
+
+
+def day_start(value: Any) -> str | None:
+    """ISO timestamp of the local (Eastern) midnight starting a "YYYY-MM-DD..." day."""
+    try:
+        day = datetime.strptime(str(value)[:10], "%Y-%m-%d")
+    except ValueError:
+        return None
+    return hq_utils.EST_TIMEZONE.localize(day).isoformat()
+
+
+def latest_daily_consumption(daily: dict[str, Any]) -> dict[str, Any]:
+    """The most recent day that has a consumption figure in a daily-consumption payload.
+
+    get_today_daily_consumption() asks for [yesterday, today], and Hydro-Québec
+    publishes a day 1 to 2 days late: the answer holds 0 to 2 days, in no
+    documented order, so pick the latest dated one instead of the first.
+    """
+    days = [(r or {}).get("courant") or {} for r in daily.get("results") or []]
+    days = [d for d in days if d.get("consoTotalQuot") is not None]
+    if not days:
+        return {}
+    return max(days, key=lambda d: str(d.get("dateJourConso") or ""))
+
+
+def peak_schedule(peaks: list[Any], now: datetime) -> list[dict[str, Any]]:
+    """Critical peaks not over yet, soonest first, with their pre-heat start."""
+    upcoming = sorted((p for p in peaks if p.end_date > now), key=lambda p: p.start_date)
+    return [
+        {
+            "start": p.start_date.isoformat(),
+            "end": p.end_date.isoformat(),
+            "preheat_start": p.preheat.start_date.isoformat(),
+            "period": p.morning_evening,
+        }
+        for p in upcoming[:MAX_SCHEDULED_PEAKS]
+    ]
+
+
+def cpc_peak_state(peak_handler: Any) -> dict[str, Any]:
+    """Time-dependent Winter Credit state, computed from already-fetched data (no HTTP)."""
+    now = hq_utils.now()
+    next_critical = peak_handler.next_critical_peak
+    return {
+        "current_state": peak_handler.current_state,
+        "critical_peak_coming": next_critical is not None,
+        # Not peak_handler.preheat_in_progress: for Winter Credit that one
+        # follows the next peak of the daily schedule, critical or not, so it
+        # would turn on before every morning and evening peak of the winter.
+        # The sensor is documented as the pre-heat before a CRITICAL peak.
+        "preheat_in_progress": bool(
+            next_critical and next_critical.preheat.start_date < now < next_critical.preheat.end_date
+        ),
+        "critical_peak_in_progress": peak_handler.current_state == "critical_peak",
+        "critical_peaks": peak_schedule(peak_handler.critical_peaks, now),
+    }
+
+
+def dpc_peak_state(peak_handler: Any) -> dict[str, Any]:
+    """Time-dependent Flex D state (every Flex D peak is a critical one), no HTTP."""
+    now = hq_utils.now()
+    return {
+        "current_state": peak_handler.current_state,
+        "peak_in_progress": peak_handler.peak_in_progress,
+        "preheat_in_progress": peak_handler.preheat_in_progress,
+        "critical_peaks": peak_schedule(peak_handler.peaks, now),
+    }
+
+
+async def cmd_peaks(params: dict[str, Any]) -> dict[str, Any]:
+    """Re-evaluate a contract's peak states now, optionally re-reading the open data first.
+
+    Cheap by design: no portal request (the Winter Credit's own peak data comes
+    from the last `poll`), at most one request to Hydro-Québec's public,
+    unauthenticated open-data feed of peak events. Called at the exact instants
+    a peak or pre-heat starts or ends, and every 15 minutes while Hydro-Québec
+    announces the next day's peaks.
+    """
+    contract = get_contract_entry(params)[0]
+    refresh_open_data = bool(params.get("refresh_open_data"))
+    result: dict[str, Any] = {"cpc": None, "dpc": None}
+    if isinstance(contract, ContractDCPC):
+        if refresh_open_data:
+            await contract.peak_handler.refresh_open_data()
+        result["cpc"] = cpc_peak_state(contract.peak_handler)
+    if isinstance(contract, ContractDPC):
+        if refresh_open_data:
+            await contract.peak_handler.refresh_open_data()
+        result["dpc"] = dpc_peak_state(contract.peak_handler)
+    return result
+
+
+async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
+    contract_id = params["contract_id"]
+    contract, account, _customer = get_contract_entry(params)
 
     # hydroqc's HydroClient is shared by every contract under one logged-in
     # WebUser, and its _select_contract() (called internally by both
@@ -172,15 +283,17 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
     daily = await contract.get_today_daily_consumption()
     await contract.refresh_outages()
 
-    daily_results = daily.get("results") or []
-    daily_today = daily_results[0]["courant"] if daily_results else {}
+    latest_day = latest_daily_consumption(daily)
 
     result: dict[str, Any] = {
         "rate": contract.rate,
         "rate_option": contract.rate_option,
         "balance": account.balance,
-        "daily_consumption_kwh": daily_today.get("consoTotalQuot"),
-        "avg_temperature": daily_today.get("tempMoyenneQuot"),
+        "daily_consumption_kwh": latest_day.get("consoTotalQuot"),
+        "avg_temperature": latest_day.get("tempMoyenneQuot"),
+        # The day those two figures are about (not the day of this poll):
+        # local midnight starting it, or None if Hydro-Québec gave no date.
+        "daily_consumption_at": day_start(latest_day.get("dateJourConso")),
         "daily_cost_mean": daily_cost_mean,
         "outage_active": any(o.status in ACTIVE_OUTAGE_STATUSES for o in contract.outages),
         "cpc": None,
@@ -194,9 +307,7 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         result["cpc"] = {
             "cumulated_credit": peak_handler.cumulated_credit,
             "projected_cumulated_credit": peak_handler.projected_cumulated_credit,
-            "current_state": peak_handler.current_state,
-            "critical_peak_coming": peak_handler.is_any_critical_peak_coming,
-            "preheat_in_progress": peak_handler.preheat_in_progress,
+            **cpc_peak_state(peak_handler),
         }
 
     if isinstance(contract, ContractDPC):
@@ -204,17 +315,15 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         peak_handler = contract.peak_handler
         await peak_handler.refresh_open_data()
         result["dpc"] = {
-            "current_state": peak_handler.current_state,
-            "peak_in_progress": peak_handler.peak_in_progress,
-            "preheat_in_progress": peak_handler.preheat_in_progress,
             "critical_called_hours": contract.critical_called_hours,
             "amount_saved_vs_base_rate": contract.amount_saved_vs_base_rate,
+            **dpc_peak_state(peak_handler),
         }
 
     return result
 
 
-COMMANDS = {"login": cmd_login, "discover": cmd_discover, "poll": cmd_poll}
+COMMANDS = {"login": cmd_login, "discover": cmd_discover, "poll": cmd_poll, "peaks": cmd_peaks}
 
 
 async def handle_request(line: str) -> None:

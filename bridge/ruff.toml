@@ -1,0 +1,6 @@
+# Lint settings for the Python side (bridge/ + its tests): run `ruff check bridge`.
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "BLE", "ASYNC", "RUF", "SLF"]
