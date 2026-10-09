@@ -12,21 +12,45 @@ One Gladys device is created **per Hydro-Québec contract** on your account
 Every device exposes:
 
 - **Daily consumption** (kWh) and **average daily cost** for the current
-  billing period ($).
+  billing period ($). Hydro-Québec publishes a day's consumption 1 to 2 days
+  late: each figure is recorded under the day it measures, once, so charts
+  show it on the right day.
 - **Average outdoor temperature** for the most recent day Hydro-Québec has
-  published.
+  published (recorded under that day too).
 - **Account balance** ($).
 - **Power outage in progress** (on/off), for the contract's service address.
 
 If the contract is enrolled in **Winter Credit (tarif D + option CPC)**, you
 also get: cumulated and projected credit ($), the current state (normal /
-anchor / critical anchor / peak / critical peak) and whether a critical peak
-or a pre-heat period is coming up.
+anchor / critical anchor / peak / critical peak), whether a critical peak is
+coming up, and whether the pre-heat before a **critical** peak is in progress
+(not before the ordinary daily peaks).
 
 If the contract is billed under **Flex D (tarif DPC)**, you also get: the
 current state (normal / critical peak), whether a peak or a pre-heat period
 is in progress, the critical hours called so far this winter, and the
 savings/loss compared to the base rate.
+
+Peak states switch **at the exact minute** a pre-heat or a critical peak
+starts or ends, not at the next refresh. During the hours Hydro-Québec
+announces the next day's peaks (10:30 to 15:00, Eastern time), the
+integration checks for new announcements every 15 minutes.
+
+## Scene triggers
+
+Requires Gladys 5.1 or later. In the scene editor, under **Integrations**:
+
+- **Hydro-Québec critical peak announced**: Hydro-Québec announced a critical
+  peak, usually the day before;
+- **Hydro-Québec pre-heat started**: the pre-heat before a critical peak just
+  started (its length is the "Pre-heat duration" setting);
+- **Hydro-Québec critical peak started** / **ended**.
+
+Each one can be limited to one contract and to morning or evening peaks, and
+passes the peak's day, start time and end time to the scene's actions, for
+example a message: "Critical peak tomorrow from 6:00 to 10:00". The first
+reading after the integration starts never fires them: a restart does not
+re-announce known peaks.
 
 ## Configuration
 

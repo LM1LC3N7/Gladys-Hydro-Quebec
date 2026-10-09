@@ -12,21 +12,49 @@ Un appareil Gladys est créé **par contrat Hydro-Québec** sur votre compte
 logement locatif, chalet...). Chaque appareil expose :
 
 - **Consommation quotidienne** (kWh) et **coût quotidien moyen** de la
-  période de facturation en cours ($).
+  période de facturation en cours ($). Hydro-Québec publie la consommation
+  d'une journée avec 1 à 2 jours de retard : chaque valeur est enregistrée
+  une seule fois, à la date de la journée mesurée, pour apparaître au bon
+  jour dans les graphiques.
 - **Température extérieure moyenne** de la dernière journée publiée par
-  Hydro-Québec.
+  Hydro-Québec (enregistrée elle aussi à la date de cette journée).
 - **Solde du compte** ($).
 - **Panne en cours** (oui/non), pour l'adresse de consommation du contrat.
 
 Si le contrat est inscrit au **Crédit Hivernal (tarif D, option CPC)**, vous
 obtenez aussi : le crédit cumulé et projeté ($), l'état courant (normal /
-ancre / ancre critique / pointe / pointe critique) et si une pointe critique
-ou une période de préchauffage approche.
+ancre / ancre critique / pointe / pointe critique), si une pointe critique
+approche, et si le préchauffage avant une pointe **critique** est en cours
+(pas avant les pointes quotidiennes ordinaires).
 
 Si le contrat est facturé au **tarif Flex D (DPC)**, vous obtenez aussi :
 l'état courant (normal / pointe critique), si une pointe ou un préchauffage
 est en cours, les heures critiques appelées depuis le début de l'hiver, et le
 gain/la perte par rapport au tarif de base.
+
+Les états de pointe basculent **à la minute près** quand un préchauffage ou
+une pointe critique commence ou se termine, et non au rafraîchissement
+suivant. Pendant les heures où Hydro-Québec annonce les pointes du
+lendemain (de 10 h 30 à 15 h, heure de l'Est), l'intégration vérifie les
+nouvelles annonces toutes les 15 minutes.
+
+## Déclencheurs de scène
+
+Nécessite Gladys 5.1 ou plus récent. Dans l'éditeur de scènes, rubrique
+**Intégrations** :
+
+- **Pointe critique Hydro-Québec annoncée** : Hydro-Québec a annoncé une
+  pointe critique, généralement la veille ;
+- **Préchauffage Hydro-Québec commencé** : le préchauffage avant une pointe
+  critique vient de commencer (sa durée est le réglage « Durée de
+  préchauffage ») ;
+- **Pointe critique Hydro-Québec commencée** / **terminée**.
+
+Chacun peut être limité à un contrat et aux pointes du matin ou du soir, et
+transmet aux actions de la scène le jour, l'heure de début et l'heure de fin
+de la pointe, par exemple pour un message : « Pointe critique demain de
+6 h à 10 h ». La première lecture après le démarrage de l'intégration ne les
+déclenche jamais : un redémarrage ne réannonce pas les pointes déjà connues.
 
 ## Configuration
 
