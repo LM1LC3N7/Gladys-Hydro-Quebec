@@ -8,7 +8,7 @@
   },
   "version": "0.1.6",
   "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.6",
-  "gladys_version": ">=4.86.0",
+  "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/main/cover.png",
   "categories": ["energy"],
   "transports": ["cloud"],
@@ -108,6 +108,496 @@
         "fr": "Tester la connexion"
       },
       "timeout_seconds": 30
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "critical_peak_announced",
+      "label": {
+        "en": "Hydro-Québec critical peak announced",
+        "fr": "Pointe critique Hydro-Québec annoncée"
+      },
+      "description": {
+        "en": "Hydro-Québec announced a Winter Credit or Flex D critical peak (usually the day before).",
+        "fr": "Hydro-Québec a annoncé une pointe critique Crédit hivernal ou Flex D (généralement la veille)."
+      },
+      "fields": [
+        {
+          "key": "contract",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Contract",
+            "fr": "Contrat"
+          },
+          "description": {
+            "en": "Leave empty for any contract.",
+            "fr": "Laissez vide pour tous les contrats."
+          },
+          "required": false
+        },
+        {
+          "key": "period",
+          "type": "select",
+          "label": {
+            "en": "Peak period",
+            "fr": "Période de pointe"
+          },
+          "description": {
+            "en": "Leave empty for both.",
+            "fr": "Laissez vide pour les deux."
+          },
+          "options": [
+            {
+              "value": "morning",
+              "label": {
+                "en": "Morning (6:00-10:00)",
+                "fr": "Matin (6 h - 10 h)"
+              }
+            },
+            {
+              "value": "evening",
+              "label": {
+                "en": "Evening (16:00-20:00)",
+                "fr": "Soir (16 h - 20 h)"
+              }
+            }
+          ],
+          "required": false
+        }
+      ],
+      "variables": [
+        {
+          "key": "day",
+          "type": "string",
+          "label": {
+            "en": "Peak day (YYYY-MM-DD)",
+            "fr": "Jour de la pointe (AAAA-MM-JJ)"
+          }
+        },
+        {
+          "key": "start_time",
+          "type": "string",
+          "label": {
+            "en": "Peak start time",
+            "fr": "Heure de début de la pointe"
+          }
+        },
+        {
+          "key": "end_time",
+          "type": "string",
+          "label": {
+            "en": "Peak end time",
+            "fr": "Heure de fin de la pointe"
+          }
+        },
+        {
+          "key": "period",
+          "type": "string",
+          "label": {
+            "en": "Period (morning/evening)",
+            "fr": "Période (morning/evening)"
+          }
+        },
+        {
+          "key": "rate",
+          "type": "string",
+          "label": {
+            "en": "Rate option (winter_credit/flex_d)",
+            "fr": "Option tarifaire (winter_credit/flex_d)"
+          }
+        },
+        {
+          "key": "contract_id",
+          "type": "string",
+          "label": {
+            "en": "Contract number",
+            "fr": "Numéro de contrat"
+          }
+        },
+        {
+          "key": "starts_at",
+          "type": "string",
+          "label": {
+            "en": "Peak start (ISO 8601)",
+            "fr": "Début de la pointe (ISO 8601)"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "Peak end (ISO 8601)",
+            "fr": "Fin de la pointe (ISO 8601)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "preheat_started",
+      "label": {
+        "en": "Hydro-Québec pre-heat started",
+        "fr": "Préchauffage Hydro-Québec commencé"
+      },
+      "description": {
+        "en": "The pre-heat window before a critical peak just started (its length is set in the configuration).",
+        "fr": "La période de préchauffage avant une pointe critique vient de commencer (durée réglée dans la configuration)."
+      },
+      "fields": [
+        {
+          "key": "contract",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Contract",
+            "fr": "Contrat"
+          },
+          "description": {
+            "en": "Leave empty for any contract.",
+            "fr": "Laissez vide pour tous les contrats."
+          },
+          "required": false
+        },
+        {
+          "key": "period",
+          "type": "select",
+          "label": {
+            "en": "Peak period",
+            "fr": "Période de pointe"
+          },
+          "description": {
+            "en": "Leave empty for both.",
+            "fr": "Laissez vide pour les deux."
+          },
+          "options": [
+            {
+              "value": "morning",
+              "label": {
+                "en": "Morning (6:00-10:00)",
+                "fr": "Matin (6 h - 10 h)"
+              }
+            },
+            {
+              "value": "evening",
+              "label": {
+                "en": "Evening (16:00-20:00)",
+                "fr": "Soir (16 h - 20 h)"
+              }
+            }
+          ],
+          "required": false
+        }
+      ],
+      "variables": [
+        {
+          "key": "day",
+          "type": "string",
+          "label": {
+            "en": "Peak day (YYYY-MM-DD)",
+            "fr": "Jour de la pointe (AAAA-MM-JJ)"
+          }
+        },
+        {
+          "key": "start_time",
+          "type": "string",
+          "label": {
+            "en": "Peak start time",
+            "fr": "Heure de début de la pointe"
+          }
+        },
+        {
+          "key": "end_time",
+          "type": "string",
+          "label": {
+            "en": "Peak end time",
+            "fr": "Heure de fin de la pointe"
+          }
+        },
+        {
+          "key": "period",
+          "type": "string",
+          "label": {
+            "en": "Period (morning/evening)",
+            "fr": "Période (morning/evening)"
+          }
+        },
+        {
+          "key": "rate",
+          "type": "string",
+          "label": {
+            "en": "Rate option (winter_credit/flex_d)",
+            "fr": "Option tarifaire (winter_credit/flex_d)"
+          }
+        },
+        {
+          "key": "contract_id",
+          "type": "string",
+          "label": {
+            "en": "Contract number",
+            "fr": "Numéro de contrat"
+          }
+        },
+        {
+          "key": "starts_at",
+          "type": "string",
+          "label": {
+            "en": "Peak start (ISO 8601)",
+            "fr": "Début de la pointe (ISO 8601)"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "Peak end (ISO 8601)",
+            "fr": "Fin de la pointe (ISO 8601)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "critical_peak_started",
+      "label": {
+        "en": "Hydro-Québec critical peak started",
+        "fr": "Pointe critique Hydro-Québec commencée"
+      },
+      "description": {
+        "en": "A Winter Credit or Flex D critical peak just started.",
+        "fr": "Une pointe critique Crédit hivernal ou Flex D vient de commencer."
+      },
+      "fields": [
+        {
+          "key": "contract",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Contract",
+            "fr": "Contrat"
+          },
+          "description": {
+            "en": "Leave empty for any contract.",
+            "fr": "Laissez vide pour tous les contrats."
+          },
+          "required": false
+        },
+        {
+          "key": "period",
+          "type": "select",
+          "label": {
+            "en": "Peak period",
+            "fr": "Période de pointe"
+          },
+          "description": {
+            "en": "Leave empty for both.",
+            "fr": "Laissez vide pour les deux."
+          },
+          "options": [
+            {
+              "value": "morning",
+              "label": {
+                "en": "Morning (6:00-10:00)",
+                "fr": "Matin (6 h - 10 h)"
+              }
+            },
+            {
+              "value": "evening",
+              "label": {
+                "en": "Evening (16:00-20:00)",
+                "fr": "Soir (16 h - 20 h)"
+              }
+            }
+          ],
+          "required": false
+        }
+      ],
+      "variables": [
+        {
+          "key": "day",
+          "type": "string",
+          "label": {
+            "en": "Peak day (YYYY-MM-DD)",
+            "fr": "Jour de la pointe (AAAA-MM-JJ)"
+          }
+        },
+        {
+          "key": "start_time",
+          "type": "string",
+          "label": {
+            "en": "Peak start time",
+            "fr": "Heure de début de la pointe"
+          }
+        },
+        {
+          "key": "end_time",
+          "type": "string",
+          "label": {
+            "en": "Peak end time",
+            "fr": "Heure de fin de la pointe"
+          }
+        },
+        {
+          "key": "period",
+          "type": "string",
+          "label": {
+            "en": "Period (morning/evening)",
+            "fr": "Période (morning/evening)"
+          }
+        },
+        {
+          "key": "rate",
+          "type": "string",
+          "label": {
+            "en": "Rate option (winter_credit/flex_d)",
+            "fr": "Option tarifaire (winter_credit/flex_d)"
+          }
+        },
+        {
+          "key": "contract_id",
+          "type": "string",
+          "label": {
+            "en": "Contract number",
+            "fr": "Numéro de contrat"
+          }
+        },
+        {
+          "key": "starts_at",
+          "type": "string",
+          "label": {
+            "en": "Peak start (ISO 8601)",
+            "fr": "Début de la pointe (ISO 8601)"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "Peak end (ISO 8601)",
+            "fr": "Fin de la pointe (ISO 8601)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "critical_peak_ended",
+      "label": {
+        "en": "Hydro-Québec critical peak ended",
+        "fr": "Pointe critique Hydro-Québec terminée"
+      },
+      "description": {
+        "en": "A Winter Credit or Flex D critical peak just ended.",
+        "fr": "Une pointe critique Crédit hivernal ou Flex D vient de se terminer."
+      },
+      "fields": [
+        {
+          "key": "contract",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Contract",
+            "fr": "Contrat"
+          },
+          "description": {
+            "en": "Leave empty for any contract.",
+            "fr": "Laissez vide pour tous les contrats."
+          },
+          "required": false
+        },
+        {
+          "key": "period",
+          "type": "select",
+          "label": {
+            "en": "Peak period",
+            "fr": "Période de pointe"
+          },
+          "description": {
+            "en": "Leave empty for both.",
+            "fr": "Laissez vide pour les deux."
+          },
+          "options": [
+            {
+              "value": "morning",
+              "label": {
+                "en": "Morning (6:00-10:00)",
+                "fr": "Matin (6 h - 10 h)"
+              }
+            },
+            {
+              "value": "evening",
+              "label": {
+                "en": "Evening (16:00-20:00)",
+                "fr": "Soir (16 h - 20 h)"
+              }
+            }
+          ],
+          "required": false
+        }
+      ],
+      "variables": [
+        {
+          "key": "day",
+          "type": "string",
+          "label": {
+            "en": "Peak day (YYYY-MM-DD)",
+            "fr": "Jour de la pointe (AAAA-MM-JJ)"
+          }
+        },
+        {
+          "key": "start_time",
+          "type": "string",
+          "label": {
+            "en": "Peak start time",
+            "fr": "Heure de début de la pointe"
+          }
+        },
+        {
+          "key": "end_time",
+          "type": "string",
+          "label": {
+            "en": "Peak end time",
+            "fr": "Heure de fin de la pointe"
+          }
+        },
+        {
+          "key": "period",
+          "type": "string",
+          "label": {
+            "en": "Period (morning/evening)",
+            "fr": "Période (morning/evening)"
+          }
+        },
+        {
+          "key": "rate",
+          "type": "string",
+          "label": {
+            "en": "Rate option (winter_credit/flex_d)",
+            "fr": "Option tarifaire (winter_credit/flex_d)"
+          }
+        },
+        {
+          "key": "contract_id",
+          "type": "string",
+          "label": {
+            "en": "Contract number",
+            "fr": "Numéro de contrat"
+          }
+        },
+        {
+          "key": "starts_at",
+          "type": "string",
+          "label": {
+            "en": "Peak start (ISO 8601)",
+            "fr": "Début de la pointe (ISO 8601)"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "Peak end (ISO 8601)",
+            "fr": "Fin de la pointe (ISO 8601)"
+          }
+        }
+      ]
     }
   ]
 }

@@ -81,6 +81,17 @@ export class HydroQcSession {
     return this.bridge.call('poll', params, { timeoutMs: 60_000 });
   }
 
+  /**
+   * Re-evaluate a contract's peak state now (`{ cpc, dpc }`), without any
+   * portal request; `refreshOpenData` first re-reads Hydro-Québec's public
+   * feed of announced peak events.
+   */
+  async fetchPeakState(contract, preheatDurationMinutes, { refreshOpenData = false } = {}) {
+    const params = { contract_id: contract.contractId, refresh_open_data: refreshOpenData };
+    if (preheatDurationMinutes !== undefined) params.preheat_duration_minutes = preheatDurationMinutes;
+    return this.bridge.call('peaks', params, { timeoutMs: 30_000 });
+  }
+
   stop() {
     this.bridge.stop();
   }

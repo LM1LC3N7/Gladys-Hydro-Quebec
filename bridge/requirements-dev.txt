@@ -1,0 +1,5 @@
+# Test/lint tooling for bridge/hq_bridge.py (CI and local development only:
+# never installed in the Docker image, which only uses requirements.txt).
+-r requirements.txt
+pytest==9.1.1
+ruff==0.16.10

@@ -15,11 +15,17 @@ import { GladysIntegration, logger } from '@gladysassistant/integration-sdk';
 import { normalizeConfig, isConfigured } from './src/config.js';
 import { HydroQcSession } from './src/hydroquebec/session.js';
 import { buildContractDevice, pollContractDevice } from './src/devices/contract.js';
+import { StatePublisher } from './src/devices/statePublisher.js';
+import { PeakMonitor } from './src/hydroquebec/peakMonitor.js';
 
 const gladys = new GladysIntegration();
 
 let config = normalizeConfig();
 let session = null;
+// Publishes only the states that changed (no duplicate history points).
+const publisher = new StatePublisher();
+// Winter Credit / Flex D: exact-time peak transitions and scene events.
+const peakMonitor = new PeakMonitor({ gladys, publisher, logger, context: () => ({ session, config }) });
 // Our own refresh loop: Gladys's device.poll_frequency is an enum of fixed
 // 1-60s values meant for fast local devices (see buildContractDevice), so it
 // cannot express "once an hour" and is never set on our devices. Instead we
@@ -58,7 +64,8 @@ async function pollAllContracts() {
   let failures = 0;
   for (const contract of session.contracts) {
     try {
-      await pollContractDevice(gladys, session, contract, config);
+      const snapshot = await pollContractDevice(gladys, session, contract, config, publisher);
+      await peakMonitor.handle(contract, snapshot);
     } catch (err) {
       failures += 1;
       lastError = err;
@@ -73,11 +80,13 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  peakMonitor.stop();
 }
 
 function schedulePolling() {
   stopPolling();
   if (!session || session.contracts.length === 0) return;
+  peakMonitor.start(session.contracts);
   pollTimer = setInterval(() => {
     pollAllContracts()
       .then(() => gladys.setConnectionStatus(true))
@@ -191,6 +200,9 @@ gladys.onConfigUpdated(async (newConfig) => {
 // --- Connection lifecycle ----------------------------------------------------
 gladys.on('connected', async () => {
   try {
+    // gladys.devices was just resynchronized: remember what Gladys already
+    // has, so unchanged values and already-stored days are not republished.
+    publisher.seed(gladys.devices);
     config = normalizeConfig(await gladys.getConfig());
     await refreshFromHydroQuebec({ forceDiscovery: false });
   } catch (err) {
@@ -202,6 +214,13 @@ gladys.on('connected', async () => {
       })
       .catch(() => {});
   }
+});
+
+// --- A discovered device was added by the user ----------------------------------
+// Its features start empty: forget what was published for them so the next
+// refresh fills them even if the values did not change since.
+gladys.onDeviceCreated(async (device) => {
+  publisher.forget((device.features ?? []).map((feature) => feature.external_id));
 });
 
 // --- Graceful shutdown -------------------------------------------------------

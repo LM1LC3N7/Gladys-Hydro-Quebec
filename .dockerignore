@@ -11,3 +11,8 @@ test-fixtures
 **/*.pyc
 .venv
 venv
+bridge/tests
+bridge/requirements-dev.txt
+bridge/ruff.toml
+.pytest_cache
+.ruff_cache
