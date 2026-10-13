@@ -58,7 +58,7 @@ test('HydroQcSession: ensureContracts re-discovers after the bridge process was 
 
     await session.ensureContracts();
     assert.notEqual(session.contracts, first, 'discovery ran again');
-    assert.deepEqual(await session.fetchContractSnapshot(session.contracts[0]), { daily_consumption_kwh: 42 });
+    assert.deepEqual(await session.fetchContractSnapshot(session.contracts[0]), { avg_temperature: -5 });
   } finally {
     session.stop();
   }

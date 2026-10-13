@@ -1,9 +1,12 @@
 # Hydro-Québec
 
-Monitor your Hydro-Québec electricity account directly in Gladys: daily
-consumption, average outdoor temperature, account balance, outages, and — if
-you are enrolled in the dynamic rate options — Winter Credit (CPC) and Flex D
+Monitor your Hydro-Québec electricity account directly in Gladys:
+consumption per half-hour, its cost computed by Gladys for your rate (Rate D,
+Flex D), average outdoor temperature, account balance, outages, and — if you
+are enrolled in the dynamic rate options — Winter Credit (CPC) and Flex D
 (DPC) peak events.
+
+Requires **Gladys 5.2** or later.
 
 ## What you get
 
@@ -11,12 +14,15 @@ One Gladys device is created **per Hydro-Québec contract** on your account
 (a single login can have several: a primary residence, a rental, a cottage...).
 Every device exposes:
 
-- **Daily consumption** (kWh) and **average daily cost** for the current
-  billing period ($). Hydro-Québec publishes a day's consumption 1 to 2 days
-  late: each figure is recorded under the day it measures, once, so charts
-  show it on the right day.
+- **Consumption (30 min)** (kWh): Hydro-Québec's hourly consumption, each
+  hour split in two equal half-hours. Hydro-Québec publishes a day about a
+  day late: each half-hour is recorded at its real time. Gladys adds a
+  **cost** feature to it on its own, computed by the energy contract you
+  attach to the device (see below).
+- **Average cost per day (current period)** ($): the average per day of the
+  current billing period, according to Hydro-Québec.
 - **Average outdoor temperature** for the most recent day Hydro-Québec has
-  published (recorded under that day too).
+  published (recorded under that day).
 - **Account balance** ($).
 - **Power outage in progress** (on/off), for the contract's service address.
 
@@ -36,9 +42,36 @@ starts or ends, not at the next refresh. During the hours Hydro-Québec
 announces the next day's peaks (10:30 to 15:00, Eastern time), the
 integration checks for new announcements every 15 minutes.
 
+## The cost of your electricity
+
+The integration gives Gladys two contract templates, **Hydro-Québec – Rate
+D** and **Hydro-Québec – Flex D** (rates of April 1, 2026), and the Flex D
+peak calendar. To get the cost of your consumption:
+
+1. Add your contract's device from the **Discovery** tab (or click
+   **Update** if it already existed).
+2. In Gladys, open **Integrations → Energy Monitoring → Contracts** and
+   create a contract: pick your Hydro-Québec contract's device as the meter,
+   then the **Rate D** or **Flex D** template. With Winter Credit, pick
+   **Rate D**: the credit itself stays tracked by the device's "Winter
+   Credit" features.
+3. That's it: Gladys computes the cost of every half-hour, shows it in its
+   energy charts and in the **Electricity price** widget, and the
+   **Electricity price changed** scene trigger follows the tier changes and
+   the peaks.
+
+For Flex D, the half-hours of the critical peaks are read from Hydro-Québec's
+open data and published in the `hq-critical-peaks` calendar: their energy is
+billed at the peak price and does not count toward the 40 kWh per day tier. A
+peak cancelled before it starts goes back to normal.
+
+On first connection, the integration fetches the consumption since the 1st
+of the current month, so the month's tiers are counted in full (10 days per
+refresh: the backfill can take a few hours).
+
 ## Scene triggers
 
-Requires Gladys 5.1 or later. In the scene editor, under **Integrations**:
+In the scene editor, under **Integrations**:
 
 - **Hydro-Québec critical peak announced**: Hydro-Québec announced a critical
   peak, usually the day before;
@@ -57,9 +90,9 @@ re-announce known peaks.
 1. Open the **Configuration** tab of the integration.
 2. Enter the same **email/username** and **password** you use to sign in at
    `session.hydroquebec.com`.
-3. Adjust the **refresh interval** if needed (Hydro-Québec only refreshes
-   daily consumption about once a day, with a 1-2 day delay — polling faster
-   than every 30-60 minutes brings no extra data).
+3. Adjust the **refresh interval** if needed (Hydro-Québec only publishes the
+   consumption about a day late — polling faster than every 30-60 minutes
+   brings no extra data).
 4. Save: your contracts appear in the **Discovery** tab.
 
 ## Actions
@@ -80,16 +113,18 @@ a real Gladys instance, not just automated tests:
 - The refresh loop, including the first reading appearing right after saving
   the configuration.
 - A contract with no current billing period yet on Hydro-Québec's side (e.g.
-  a newly added or secondary meter): consumption, temperature, balance and
-  outage status still come through, only the daily cost is left blank for it.
-- Base "D" rate consumption, temperature, balance and outage figures, over
-  repeated refresh cycles.
+  a newly added or secondary meter): temperature, balance and outage status
+  still come through, only the average cost per day is left blank for it.
 
-**Not yet independently confirmed**: the Winter Credit (CPC) and Flex D
-(DPC) peak-event figures are implemented directly against the same
-already-computed values the Home Assistant Hydro-Québec integration uses,
-but no account enrolled in either option has used this integration yet —
-if you are and something looks off, please open an issue.
+**Not yet confirmed on a real account**:
+
+- the consumption per half-hour and its cost computed by Gladys (new in this
+  version);
+- the Winter Credit (CPC) and Flex D (DPC) peak-event figures: they come from
+  the same values the Home Assistant Hydro-Québec integration uses, but no
+  account enrolled in either option has used this integration yet.
+
+If something looks off, please open an issue.
 
 ## Important notes
 
@@ -99,9 +134,19 @@ if you are and something looks off, please open an issue.
   open an issue on the repository.
 - Your password is stored encrypted by Gladys (`secret` field) and is only
   ever sent to Hydro-Québec's own servers.
-- The "average daily cost" figure is the current billing period's average
-  $/day, not an exact per-day breakdown: Hydro-Québec's free API does not
-  expose one for the base "D" rate.
+- The cost computed by Gladys is an estimate: Hydro-Québec bills about every
+  two months, Gladys counts the tiers per month. The difference only shows
+  when a very heavy month and a light one fall in the same bill. The Winter
+  Credit is not deducted from that cost.
+- The rates change every April 1: a new version of the templates will
+  follow, and Gladys will offer to update your contract.
+
+## Upgrading from a previous version
+
+The **Discovery** tab shows a structure change: click **Update**. The
+**daily consumption** is replaced by the consumption per half-hour (its
+history is deleted), and the "average daily cost" becomes the **average cost
+per day (current period)**, a plain dollar amount (its history is kept).
 
 ## Troubleshooting
 

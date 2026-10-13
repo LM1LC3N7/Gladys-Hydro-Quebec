@@ -92,6 +92,24 @@ export class HydroQcSession {
     return this.bridge.call('peaks', params, { timeoutMs: 30_000 });
   }
 
+  /**
+   * Hourly consumption of the given Eastern days (`YYYY-MM-DD`), as
+   * `{ days: [{ date, complete, intervals: [{ starts_at, kwh }] }] }`: the
+   * 30-minute intervals Gladys prices. One portal request per day.
+   */
+  async fetchHourlyConsumption(contract, dates) {
+    return this.bridge.call(
+      'hourly',
+      { contract_id: contract.contractId, dates },
+      { timeoutMs: 30_000 + dates.length * 15_000 },
+    );
+  }
+
+  /** The Flex D peak events of Hydro-Québec's public feed (`[{ start, end }]`, UTC), no portal request. */
+  async fetchPeakEvents() {
+    return this.bridge.call('peak_events', {}, { timeoutMs: 30_000 });
+  }
+
   stop() {
     this.bridge.stop();
   }

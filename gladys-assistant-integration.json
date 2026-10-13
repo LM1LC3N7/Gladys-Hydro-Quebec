@@ -3,12 +3,12 @@
   "type": "device",
   "name": "Hydro-Québec",
   "description": {
-    "en": "Hydro-Québec electricity consumption, Winter Credit and Flex D peaks, billing and outages.",
-    "fr": "Consommation Hydro-Québec, pointes Crédit Hivernal et Flex D, facturation et pannes."
+    "en": "Hydro-Québec consumption priced by Gladys (Rate D, Flex D), peaks, billing and outages.",
+    "fr": "Consommation Hydro-Québec tarifée par Gladys (Tarif D, Flex D), pointes, facture et pannes."
   },
   "version": "0.1.6",
   "docker_image": "ghcr.io/lm1lc3n7/gladys-hydro-quebec:0.1.6",
-  "gladys_version": ">=5.1.0",
+  "gladys_version": ">=5.2.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/Gladys-Hydro-Quebec/main/cover.png",
   "categories": ["energy"],
   "transports": ["cloud"],
@@ -599,5 +599,146 @@
         }
       ]
     }
-  ]
+  ],
+  "energy_contracts": {
+    "templates": [
+      {
+        "key": "hydro-quebec-d",
+        "name": {
+          "en": "Hydro-Québec – Rate D",
+          "fr": "Hydro-Québec – Tarif D"
+        },
+        "country": "CA",
+        "currency": "CAD",
+        "timezone": "America/Toronto",
+        "pricing_mode": "rules",
+        "version": "2026-04-01",
+        "tariff": {
+          "tariff_version": 1,
+          "components": [
+            {
+              "key": "energy",
+              "kind": "consumption",
+              "rules": [
+                {
+                  "label": "Palier 1",
+                  "when": {
+                    "tier": {
+                      "cumulative": "billing_period",
+                      "from_kwh_per_day": 0,
+                      "to_kwh_per_day": 40
+                    }
+                  },
+                  "price": 0.07065
+                }
+              ],
+              "fallback": {
+                "label": "Palier 2",
+                "price": 0.11142
+              }
+            },
+            {
+              "key": "acces",
+              "kind": "fixed",
+              "amount": 0.46154,
+              "per": "day"
+            }
+          ]
+        }
+      },
+      {
+        "key": "hydro-quebec-flex-d",
+        "name": {
+          "en": "Hydro-Québec – Flex D",
+          "fr": "Hydro-Québec – Flex D"
+        },
+        "country": "CA",
+        "currency": "CAD",
+        "timezone": "America/Toronto",
+        "pricing_mode": "rules",
+        "version": "2026-04-01",
+        "calendars": ["hq-critical-peaks"],
+        "tariff": {
+          "tariff_version": 1,
+          "calendars": ["hq-critical-peaks"],
+          "components": [
+            {
+              "key": "energy",
+              "kind": "consumption",
+              "rules": [
+                {
+                  "label": "Pointe",
+                  "when": {
+                    "calendar": {
+                      "hq-critical-peaks": "critical-peak"
+                    }
+                  },
+                  "price": 0.46463
+                },
+                {
+                  "label": "Hiver palier 1",
+                  "when": {
+                    "season": {
+                      "from": "12-01",
+                      "to": "03-31"
+                    },
+                    "tier": {
+                      "cumulative": "billing_period",
+                      "from_kwh_per_day": 0,
+                      "to_kwh_per_day": 40,
+                      "counts_when": {
+                        "not_calendar": {
+                          "hq-critical-peaks": "critical-peak"
+                        }
+                      }
+                    }
+                  },
+                  "price": 0.04886
+                },
+                {
+                  "label": "Hiver palier 2",
+                  "when": {
+                    "season": {
+                      "from": "12-01",
+                      "to": "03-31"
+                    }
+                  },
+                  "price": 0.09103
+                },
+                {
+                  "label": "Été palier 1",
+                  "when": {
+                    "tier": {
+                      "cumulative": "billing_period",
+                      "from_kwh_per_day": 0,
+                      "to_kwh_per_day": 40
+                    }
+                  },
+                  "price": 0.07065
+                }
+              ],
+              "fallback": {
+                "label": "Été palier 2",
+                "price": 0.11142
+              }
+            },
+            {
+              "key": "acces",
+              "kind": "fixed",
+              "amount": 0.46154,
+              "per": "day"
+            }
+          ]
+        }
+      }
+    ],
+    "calendars": [
+      {
+        "key": "hq-critical-peaks",
+        "granularity": "thirty_minutes",
+        "values": ["normal", "critical-peak"],
+        "timezone": "America/Toronto"
+      }
+    ]
+  }
 }

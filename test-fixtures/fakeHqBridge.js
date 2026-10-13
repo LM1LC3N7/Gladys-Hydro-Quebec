@@ -35,7 +35,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     if (!known.has(request.contract_id)) {
       reply(request.id, false, `Unknown contract ${request.contract_id}: call discover first`);
     } else {
-      reply(request.id, true, { daily_consumption_kwh: 42 });
+      reply(request.id, true, { avg_temperature: -5 });
     }
   } else {
     reply(request.id, false, `Unknown command '${request.cmd}'`);

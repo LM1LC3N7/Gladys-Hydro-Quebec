@@ -17,6 +17,8 @@ import { HydroQcSession } from './src/hydroquebec/session.js';
 import { buildContractDevice, pollContractDevice } from './src/devices/contract.js';
 import { StatePublisher } from './src/devices/statePublisher.js';
 import { PeakMonitor } from './src/hydroquebec/peakMonitor.js';
+import { ConsumptionPublisher } from './src/hydroquebec/consumption.js';
+import { PeakCalendarPublisher } from './src/hydroquebec/peakCalendar.js';
 
 const gladys = new GladysIntegration();
 
@@ -25,7 +27,17 @@ let session = null;
 // Publishes only the states that changed (no duplicate history points).
 const publisher = new StatePublisher();
 // Winter Credit / Flex D: exact-time peak transitions and scene events.
-const peakMonitor = new PeakMonitor({ gladys, publisher, logger, context: () => ({ session, config }) });
+const peakMonitor = new PeakMonitor({
+  gladys,
+  publisher,
+  logger,
+  context: () => ({ session, config }),
+  onAnnouncementCheck: () => refreshPeakCalendar(),
+});
+// Dated 30-minute consumption, priced by Gladys's energy contracts.
+const consumption = new ConsumptionPublisher({ gladys, logger });
+// The `hq-critical-peaks` calendar the Flex D contract template reads.
+const peakCalendar = new PeakCalendarPublisher({ gladys, logger });
 // Our own refresh loop: Gladys's device.poll_frequency is an enum of fixed
 // 1-60s values meant for fast local devices (see buildContractDevice), so it
 // cannot express "once an hour" and is never set on our devices. Instead we
@@ -70,9 +82,31 @@ async function pollAllContracts() {
       failures += 1;
       lastError = err;
       logger.error(`Poll failed for contract ${contract.contractId}`, err);
+      continue;
     }
+    await publishConsumption(contract);
   }
+  await refreshPeakCalendar();
   if (failures > 0 && failures === session.contracts.length) throw lastError;
+}
+
+/** Publish the new consumption of one contract; a failure is retried at the next poll. */
+async function publishConsumption(contract) {
+  try {
+    await consumption.publish(session, contract);
+  } catch (err) {
+    logger.error(`Consumption publication failed for contract ${contract.contractId}`, err);
+  }
+}
+
+/** Publish the Flex D peak slots that changed; a failure is retried at the next poll. */
+async function refreshPeakCalendar() {
+  if (!session) return;
+  try {
+    await peakCalendar.refresh(session);
+  } catch (err) {
+    logger.error('Peak calendar publication failed', err);
+  }
 }
 
 function stopPolling() {
@@ -108,6 +142,9 @@ function replaceSession(newSession) {
   stopPolling();
   session?.stop();
   session = newSession;
+  // Another account: its contracts start over from the 1st of the month.
+  consumption.reset();
+  peakCalendar.reset();
 }
 
 async function refreshFromHydroQuebec({ forceDiscovery = false } = {}) {
@@ -221,6 +258,12 @@ gladys.on('connected', async () => {
 // refresh fills them even if the values did not change since.
 gladys.onDeviceCreated(async (device) => {
   publisher.forget((device.features ?? []).map((feature) => feature.external_id));
+  // Its consumption was refused until now (404): send it without waiting for
+  // the next poll.
+  const contract = session?.contracts.find(
+    (c) => gladys.externalIds('contract', c.contractId).device === device.external_id,
+  );
+  if (contract) await publishConsumption(contract);
 });
 
 // --- Graceful shutdown -------------------------------------------------------

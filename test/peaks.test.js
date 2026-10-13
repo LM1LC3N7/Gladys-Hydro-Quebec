@@ -108,6 +108,7 @@ test('PeakMonitor: publishes changed peak features, fires scene events, re-arms 
   const published = [];
   const events = [];
   const scheduled = [];
+  const announcementHooks = [];
   const gladys = {
     externalIds: (kind, id) => ({ device: `ext:hq:${kind}:${id}`, feature: (k) => `ext:hq:${kind}:${id}:${k}` }),
     publishStates: async (states) => published.push(...states),
@@ -128,6 +129,7 @@ test('PeakMonitor: publishes changed peak features, fires scene events, re-arms 
     publisher: null,
     context: () => ({ session, config: {} }),
     scheduler: { schedule: (id, peaks) => scheduled.push([id, peaks.length]), stop() {}, startAnnouncementChecks() {} },
+    onAnnouncementCheck: async () => announcementHooks.push('calendar'),
   });
 
   await monitor.refreshContract(contract.contractId);
@@ -142,6 +144,7 @@ test('PeakMonitor: publishes changed peak features, fires scene events, re-arms 
     [contract.contractId, 0],
     [contract.contractId, 1],
   ]);
+  assert.deepEqual(announcementHooks, ['calendar'], 'the peak calendar is refreshed with the announcements');
 });
 
 test('PeakMonitor: a failing scene event never blocks the rest', async () => {

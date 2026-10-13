@@ -54,11 +54,26 @@ test('buildContractDevice: never sets device.poll_frequency (Gladys enum is inco
   assert.equal(device.poll_frequency, undefined);
 });
 
-test('contractStates: the daily consumption and temperature are filed under the day they measure', async () => {
+test('buildContractDevice: a 30-minute consumption and no daily one, the average cost per day is an amount', () => {
+  const device = buildContractDevice(fakeGladys, { ...baseContract, rate: 'D', rateOption: null });
+  const byKey = Object.fromEntries(device.features.map((f) => [f.external_id.split(':').pop(), f]));
+  assert.equal(byKey.thirty_minutes_consumption.category, 'energy-sensor');
+  assert.equal(byKey.thirty_minutes_consumption.type, 'thirty-minutes-consumption');
+  assert.equal(byKey.thirty_minutes_consumption.unit, 'kilowatt-hour');
+  assert.equal(byKey.daily_consumption, undefined);
+  // Same key as before (its history is kept), no longer an energy cost.
+  assert.equal(byKey.daily_consumption_cost.category, 'currency');
+  assert.equal(byKey.daily_consumption_cost.type, 'decimal');
+  assert.ok(
+    !device.features.some((f) => f.type.endsWith('-consumption-cost')),
+    'the energy cost is derived by Gladys, never published',
+  );
+});
+
+test('contractStates: the temperature is filed under the day it measures, the consumption is not a state', async () => {
   const { contractStates } = await import('../src/devices/contract.js');
   const ids = fakeGladys.externalIds('contract', '123');
   const states = contractStates(ids, {
-    daily_consumption_kwh: 52,
     avg_temperature: -12,
     daily_consumption_at: '2026-01-12T00:00:00-05:00',
     daily_cost_mean: 4.2,
@@ -66,8 +81,10 @@ test('contractStates: the daily consumption and temperature are filed under the 
     outage_active: false,
   });
   const byFeature = Object.fromEntries(states.map((s) => [s.device_feature_external_id.split(':').pop(), s]));
-  assert.equal(byFeature.daily_consumption.created_at, '2026-01-12T00:00:00-05:00');
   assert.equal(byFeature.avg_temperature.created_at, '2026-01-12T00:00:00-05:00');
+  assert.equal(byFeature.daily_consumption_cost.state, 4.2);
+  assert.equal(byFeature.daily_consumption_cost.created_at, undefined);
+  assert.equal(byFeature.thirty_minutes_consumption, undefined);
   assert.equal(byFeature.balance.created_at, undefined, 'live values keep the time of the reading');
   assert.equal(byFeature.power_outage.state, 0);
 });
