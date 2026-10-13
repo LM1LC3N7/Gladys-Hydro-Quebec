@@ -1,57 +1,38 @@
-# Keeps every dependency this integration ships up to date, most importantly
-# `Hydro-Quebec-API-Wrapper` (the community-maintained `hydroqc` library this
-# whole integration is a thin adapter over, see bridge/hq_bridge.py). Each
-# entry opens a PR on its own schedule; CI (.github/workflows/ci.yml) runs
-# against it automatically, so merging it is what ships the update on the
-# next release.
+# -----------------------------------------------------------------------------
+# Dependabot: update pull requests, checked by the CI like any other.
 #
-# `target-branch: main` is pinned defensively on every entry: without it,
-# Dependabot targets whatever the repo's GitHub "default branch" setting
-# says, and that setting drifting away from `main` is exactly what broke the
-# 0.1.1 release (see release.yml's multi-branch push comment) — pinning it
-# here means a repeat of that drift can no longer misdirect Dependabot too.
+#   - npm, monthly: the Gladys SDK first of all (new device categories and
+#     features arrive through it); the development tools share one PR;
+#   - GitHub Actions, monthly, all in one PR.
+#
+# Monthly rather than weekly: every update pull request runs the CI, and the
+# GitHub Actions minutes are counted.
+#
+# The Docker base image is left out on purpose: `node:24-alpine` is a moving
+# tag, pulled fresh by every release build (latest Node 24 and Alpine patches),
+# and moving to the next Node major is a deliberate change (Dockerfile, CI
+# matrix and `engines` together).
+# -----------------------------------------------------------------------------
 version: 2
 updates:
-  # The actual Hydro-Québec logic. Checked weekly since a Hydro-Québec portal
-  # change is more likely to require a fresh hydroqc release than the rest of
-  # the stack.
-  - package-ecosystem: 'pip'
-    directory: '/bridge'
-    target-branch: 'main'
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: 'weekly'
-    labels: ['dependencies', 'hydroqc']
-
-  - package-ecosystem: 'npm'
-    directory: '/'
-    target-branch: 'main'
-    schedule:
-      interval: 'weekly'
-    labels: ['dependencies']
-    # Lint/format tooling only (never shipped in the image): one PR per week
-    # for all of it instead of one per package.
+      interval: monthly
     groups:
-      dev-tooling:
-        dependency-type: 'development'
+      dev-dependencies:
+        dependency-type: development
 
-  - package-ecosystem: 'docker'
-    directory: '/'
-    target-branch: 'main'
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: 'weekly'
-    labels: ['dependencies']
-    # Odd-numbered Node.js majors are short-lived "Current" releases that never
-    # become LTS (node:25 was proposed here and reached end of life on
-    # 2026-06-01). The base image moves from one LTS major to the next by hand
-    # (keep ci.yml's node-version and package.json's engines in step); minor and
-    # patch updates of the current LTS still come through Dependabot.
-    ignore:
-      - dependency-name: 'node'
-        update-types: ['version-update:semver-major']
+      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - '*'
 
-  - package-ecosystem: 'github-actions'
-    directory: '/'
-    target-branch: 'main'
+  - package-ecosystem: pip
+    directory: /bridge
     schedule:
-      interval: 'weekly'
-    labels: ['dependencies']
+      interval: monthly

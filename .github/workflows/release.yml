@@ -1,158 +1,114 @@
+# -----------------------------------------------------------------------------
+# Cut a new release — entirely from the GitHub UI, no local tooling needed.
+#
+# In GitHub: Actions -> Release -> "Run workflow" -> pick patch / minor / major.
+#
+# What it does, in one run:
+#   1. computes the next semver from `package.json` (npm version rules);
+#   2. writes it into `package.json`, `package-lock.json` AND the manifest
+#      (`gladys-assistant-integration.json`: both `version` and the
+#      `docker_image` tag, so the indexer and the image stay in lockstep);
+#   3. moves the `## [Unreleased]` section of `CHANGELOG.md` under the version;
+#   4. commits the bump and pushes the `vX.Y.Z` tag;
+#   5. calls build.yml to publish the multi-arch image (`:X.Y.Z` + `:latest`);
+#   6. calls github-release.yml to publish the GitHub Release of the tag.
+#
+# Why call build.yml and github-release.yml instead of relying on the tag push:
+# a tag pushed with the default GITHUB_TOKEN does NOT trigger other workflows,
+# so we invoke them ourselves. No personal access token to create.
+# -----------------------------------------------------------------------------
 name: Release
 
-# Bumps the version in gladys-assistant-integration.json + package.json (or
-# releases the version already in the manifest as-is, with "current" - e.g.
-# the first release), tags it, publishes an actual GitHub Release, and
-# builds/pushes a multi-arch image to ghcr.io - all in one run, so creating a
-# release always builds and publishes its image; there is no separate manual
-# docker step and no second workflow that could fail to be triggered.
-# Run it from the Actions tab (Release -> Run workflow -> pick a bump).
-#
-# One-time manual setup this workflow depends on (cannot be done from here):
-#   - After the FIRST successful run: the repo's "Packages" sidebar links to
-#     the new ghcr.io package -> Package settings -> Change visibility ->
-#     Public. A private package cannot be pulled by a Gladys instance (no
-#     registry credentials exist anywhere in the external-integration
-#     protocol).
 on:
   workflow_dispatch:
     inputs:
-      bump:
-        description: "Version bump ('current' releases the manifest's existing version as-is, e.g. the first release)"
+      release-type:
+        description: 'Version bump for this release'
         required: true
-        default: 'patch'
         type: choice
-        options: [current, patch, minor, major]
-
-permissions:
-  contents: write
-  packages: write
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit the version bump and push the tag
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Compute the release version
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Bump version, update the manifest and the changelog
         id: bump
-        run: |
-          set -euo pipefail
-          CURRENT=$(node -p "require('./gladys-assistant-integration.json').version")
-          if [ "${{ inputs.bump }}" = "current" ]; then
-            NEW_VERSION="$CURRENT"
-          else
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-            case "${{ inputs.bump }}" in
-              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-              patch) PATCH=$((PATCH + 1)) ;;
-            esac
-            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          fi
-          if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
-            echo "::error::Tag v$NEW_VERSION already exists - pick a different bump." >&2
-            exit 1
-          fi
-          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "changed=$([ "$NEW_VERSION" != "$CURRENT" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-      - name: Bump version in the manifest and package.json
-        if: steps.bump.outputs.changed == 'true'
-        run: |
-          set -euo pipefail
-          node -e "
-            const fs = require('fs');
-            const manifestPath = 'gladys-assistant-integration.json';
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-            manifest.version = '${{ steps.bump.outputs.version }}';
-            manifest.docker_image = manifest.docker_image.replace(/:[^:]+\$/, ':${{ steps.bump.outputs.version }}');
-            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-            const pkgPath = 'package.json';
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            pkg.version = '${{ steps.bump.outputs.version }}';
-            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-          # JSON.stringify always multi-lines every array regardless of
-          # length, which disagrees with Prettier's style (a short array
-          # like `categories`/`transports` collapses to one line) -
-          # reformat back to that style so this commit doesn't leave main
-          # failing `npm run format:check` for every PR opened afterwards,
-          # whether or not they touch this file.
-          npx --yes prettier --write gladys-assistant-integration.json
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add gladys-assistant-integration.json package.json
-          git commit -m "Release v${{ steps.bump.outputs.version }}"
-
-          # Push to every branch that must carry the release commit, not just
-          # the one this run was dispatched against: GitHub's actual "default
-          # branch" setting (whichever branch it is) is what
-          # installFromRepoUrl/fetchManifestFromRepo reads the manifest from,
-          # and it silently serving a stale docker_image tag if only one
-          # branch got the bump is exactly the bug that broke the 0.1.1
-          # rollout - Gladys kept reinstalling 0.1.0 because the repo's
-          # default branch never got the version bump.
-          for branch in main claude/shared-conversation-ekuxqd "${{ github.ref_name }}"; do
-            git push origin "HEAD:$branch"
-          done
-
-      - name: Tag
-        run: |
-          set -euo pipefail
-          git tag "v${{ steps.bump.outputs.version }}"
-          git push origin "v${{ steps.bump.outputs.version }}"
-
-      - name: Publish the GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TYPE: ${{ inputs.release-type }}
         run: |
-          gh release create "v${{ steps.bump.outputs.version }}" \
-            --title "v${{ steps.bump.outputs.version }}" \
-            --generate-notes
-
-      - name: Compute lowercase image name
-        id: image
-        # ghcr.io requires a lowercase path; GitHub Actions expressions have
-        # no built-in lowercase function, so this runs through the shell.
-        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Read the manifest for the image label
-        id: manifest
-        run: |
-          # Gladys reads the manifest from the io.gladysassistant.manifest
-          # image label for a "dev install by image name" (Developer mode
-          # without a GitHub repo) and for "Force update" of such an install:
-          # embed it here (gladys-assistant-integration.json on disk was
-          # already bumped to this release's version/docker_image above) so
-          # config schema / actions / containers changes ship with the image.
           set -euo pipefail
-          manifest="$(jq -c . gladys-assistant-integration.json)"
-          {
-            echo "json<<MANIFEST_EOF"
-            echo "$manifest"
-            echo "MANIFEST_EOF"
-          } >> "$GITHUB_OUTPUT"
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.bump.outputs.version }}
-            ${{ steps.image.outputs.name }}:latest
-          labels: |
-            io.gladysassistant.manifest=${{ steps.manifest.outputs.json }}
+          # npm computes the next semver and writes it to package.json (and
+          # package-lock.json). --no-git-tag-version: we own the commit + tag
+          # below, so npm must not touch git.
+          new_version="$(npm version "$RELEASE_TYPE" --no-git-tag-version | tail -n1)"
+          new_version="${new_version#v}" # v1.2.0 -> 1.2.0
+
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${new_version}"
+
+          # Keep the manifest in lockstep: the version the indexer reads AND the
+          # image tag Gladys pulls must both point at this release. The script
+          # rewrites those two values in place (re-printing the file with jq
+          # would break the Prettier layout, and the CI format check with it),
+          # and moves the [Unreleased] changes of CHANGELOG.md under the version.
+          node .github/scripts/release.mjs prepare "$new_version" "$image" \
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
+
+      # Note: if the branch you release from is protected against direct pushes,
+      # GitHub rejects the push below (the default GITHUB_TOKEN cannot bypass
+      # branch protection). Allow GitHub Actions to bypass the rule, or release
+      # from an unprotected branch.
+      - name: Commit, tag and push
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add package.json package-lock.json gladys-assistant-integration.json
+          if [ -f CHANGELOG.md ]; then git add CHANGELOG.md; fi
+          git commit -m "chore(release): ${VERSION}"
+          git tag -a "v${VERSION}" -m "Release ${VERSION}"
+
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "v${VERSION}"
+
+  # Build and publish the image for the version we just tagged.
+  build:
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  # Publish the GitHub Release of the new tag, once its image exists: the
+  # Gladys Supervision page links each version to the repository's releases.
+  github-release:
+    needs: build
+    uses: ./.github/workflows/github-release.yml
+    permissions:
+      contents: write
