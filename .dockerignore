@@ -16,3 +16,4 @@ bridge/requirements-dev.txt
 bridge/ruff.toml
 .pytest_cache
 .ruff_cache
+new-integrations

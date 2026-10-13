@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "audit": "npm audit --omit=dev"
   },
   "engines": {
