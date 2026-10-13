@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
 ### Added
 
 - The cost of the consumption, computed by Gladys's energy contracts: the
@@ -43,5 +45,6 @@ the notes of the version's GitHub Release.
 The releases before this file was started are described by their GitHub
 Releases.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-hydro-quebec/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/Gladys-Hydro-Quebec/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/LM1LC3N7/Gladys-Hydro-Quebec/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/LM1LC3N7/gladys-hydro-quebec/releases/tag/v0.1.6
