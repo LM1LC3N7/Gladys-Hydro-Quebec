@@ -280,17 +280,30 @@ export class TadoApp {
         entry.zones.set(zone.id, { ...(entry.zones.get(zone.id) ?? {}), ...zone });
       }
     } else {
-      for (const raw of await this.client.zones(home.id)) {
-        const zone = zoneFromV2(raw, {});
-        const known = entry.zones.get(zone.id);
+      const raws = await this.client.zones(home.id);
+      const previousDefinitions = entry.zoneDefinitions;
+      entry.zoneDefinitions = new Map();
+      for (const raw of raws) {
+        const definition = { ...raw };
+        if (raw.type === ZONE_TYPES.HOT_WATER && definition.canSetTemperature === undefined) {
+          const known = previousDefinitions?.get(String(raw.id))?.canSetTemperature;
+          definition.canSetTemperature =
+            known ??
+            (await this.client
+              .zoneCapabilities(home.id, raw.id)
+              .then((c) => c?.canSetTemperature === true)
+              .catch(() => false));
+        }
+        entry.zoneDefinitions.set(String(raw.id), definition);
+        const zone = zoneFromV2(definition, {});
+        const current = entry.zones.get(zone.id);
         entry.zones.set(
           zone.id,
-          known
-            ? { ...known, name: zone.name, lowBattery: zone.lowBattery, devices: zone.devices }
+          current
+            ? { ...current, name: zone.name, lowBattery: zone.lowBattery, devices: zone.devices }
             : zone,
         );
       }
-      entry.zoneDefinitions = new Map([...entry.zones.values()].map((z) => [z.id, z]));
     }
     entry.devicesAt = this.now();
   }

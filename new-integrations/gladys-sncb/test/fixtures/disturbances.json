@@ -1,0 +1,135 @@
+{
+ "version": "1.4",
+ "timestamp": "1791897749",
+ "disturbance": [
+  {
+   "id": "0",
+   "title": "Mortsel - Mortsel-Liersesteenweg : Retards et suppressions",
+   "description": "Entre Anvers-Central et Malines :\nLa circulation des trains est perturbée.\nDes retards et suppressions sont possibles.\n\nCertains trains S1 Anvers-Central - Malines - Nivelles ne s'arrêtent pas à Mortsel.\nPour vous rendre à Mortsel, vous pouvez voyager via Kontich.\nLa durée de cette perturbation est encore indéterminée.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne à un aiguillage",
+   "type": "disturbance",
+   "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114182&channelFilter=custom1&",
+   "timestamp": "1791897488",
+   "richtext": "Entre Anvers-Central et Malines :\nLa circulation des trains est perturbée.\nDes retards et suppressions sont possibles.\n\nCertains trains S1 Anvers-Central - Malines - Nivelles ne s'arrêtent pas à Mortsel.\nPour vous rendre à Mortsel, vous pouvez voyager via Kontich.\nLa durée de cette perturbation est encore indéterminée.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne à un aiguillage",
+   "descriptionLinks": {
+    "number": "1",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114182&channelFilter=custom1&",
+      "text": "Lire plus"
+     }
+    ]
+   }
+  },
+  {
+   "id": "1",
+   "title": "Ekeren - Sint-Mariaburg : Retards et suppressions",
+   "description": "Entre Essen et Puurs :\nDes retards et suppressions sont possibles.\nLa fin des perturbations est estimée entre 15:30 et 16:30.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne à un aiguillage",
+   "type": "disturbance",
+   "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114180&channelFilter=custom1&",
+   "timestamp": "1791897320",
+   "richtext": "Entre Essen et Puurs :\nDes retards et suppressions sont possibles.\nLa fin des perturbations est estimée entre 15:30 et 16:30.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne à un aiguillage",
+   "descriptionLinks": {
+    "number": "1",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114180&channelFilter=custom1&",
+      "text": "Lire plus"
+     }
+    ]
+   }
+  },
+  {
+   "id": "2",
+   "title": "Chatelet : Retards",
+   "description": "Entre Charleroi-Central et Tamines/Namur :\nDes retards sont possibles.\nNous attendons des informations supplémentaires d'une équipe technique.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne au niveau des signaux",
+   "type": "disturbance",
+   "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114181&channelFilter=custom1&",
+   "timestamp": "1791896155",
+   "richtext": "Entre Charleroi-Central et Tamines/Namur :\nDes retards sont possibles.\nNous attendons des informations supplémentaires d'une équipe technique.\n\nÉcoutez les annonces, consultez les écrans ou planifiez votre voyage sur sncb.be ou l'app SNCB.\n\n\nCause : panne au niveau des signaux",
+   "descriptionLinks": {
+    "number": "1",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=showmap_external&tplParamHimMsgInfoGroup=trouble&messageID=114181&channelFilter=custom1&",
+      "text": "Lire plus"
+     }
+    ]
+   }
+  },
+  {
+   "id": "3",
+   "title": "Charleroi-Central - Couvin",
+   "description": "Le week-end du 7-8/11, Infrabel effectue des travaux.\n\nUn bus SNCB circule entre Charleroi-Central, Walcourt et Couvin.\n\nLe planificateur de voyages tient déjà compte de ces adaptations. Les temps de parcours des bus SNCB peuvent varier selon la densité du trafic. Ceci peut entraîner des temps de trajet plus longs.\n\nEn savoir plus sur les bus SNCB (FAQ) \nOù prendre mon bus ?",
+   "type": "planned",
+   "link": "https://www.belgiantrain.be/fr/support/faq/faq-routes-schedules/faq-bus",
+   "timestamp": "1791873844",
+   "richtext": "Le week-end du 7-8/11, Infrabel effectue des travaux.\n\nUn bus SNCB circule entre Charleroi-Central, Walcourt et Couvin.\n\nLe planificateur de voyages tient déjà compte de ces adaptations. Les temps de parcours des bus SNCB peuvent varier selon la densité du trafic. Ceci peut entraîner des temps de trajet plus longs.\n\nEn savoir plus sur les bus SNCB (FAQ) \nOù prendre mon bus ?",
+   "descriptionLinks": {
+    "number": "2",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "https://www.belgiantrain.be/fr/support/faq/faq-routes-schedules/faq-bus",
+      "text": "En savoir plus sur les bus SNCB (FAQ) "
+     },
+     {
+      "id": "1",
+      "link": "https://www.belgianrail.be/jp/download/brail_him/1791873844124_FR_2611003_S.pdf",
+      "text": "Où prendre mon bus ?"
+     }
+    ]
+   }
+  },
+  {
+   "id": "4",
+   "title": "Louvain - Landen",
+   "description": "En semaine, du 2 au 6/11, Infrabel effectue des travaux.\n\nTous les trains sont remplacés par des bus SNCB entre Louvain et Landen.\nLe parcours et l'heure de départ des trains qui circulent entre Louvain et Landen sont adaptés.\n\nLe planificateur de voyages tient déjà compte de ces adaptations.\nPlus d'infos\nOù prendre mon bus ?",
+   "type": "planned",
+   "link": "https://www.belgiantrain.be/fr/news/works-leuven-landen-autumn",
+   "timestamp": "1791553134",
+   "richtext": "En semaine, du 2 au 6/11, Infrabel effectue des travaux.\n\nTous les trains sont remplacés par des bus SNCB entre Louvain et Landen.\nLe parcours et l'heure de départ des trains qui circulent entre Louvain et Landen sont adaptés.\n\nLe planificateur de voyages tient déjà compte de ces adaptations.\nPlus d'infos\nOù prendre mon bus ?",
+   "descriptionLinks": {
+    "number": "2",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "https://www.belgiantrain.be/fr/news/works-leuven-landen-autumn",
+      "text": "Plus d'infos"
+     },
+     {
+      "id": "1",
+      "link": "https://www.belgianrail.be/jp/download/brail_him/1791553134135_FR_2611142_S.pdf",
+      "text": "Où prendre mon bus ?"
+     }
+    ]
+   }
+  },
+  {
+   "id": "5",
+   "title": "Charleroi-Central - Maubeuge (FR)",
+   "description": "Du 17 au 25/10, Infrabel effectue des travaux.\n\nTous les trains sont remplacés par des bus SNCB entre Charleroi-Central, Erquelinnes et Maubeuge (FR).\nAttention, ces bus ne font pas arrêt à Hourpes.\n\nLe planificateur de voyages tient déjà compte de ces adaptations. Les temps de parcours des bus SNCB peuvent varier selon la densité du trafic. Ceci peut entraîner des temps de trajet plus longs.\n\nEn savoir plus sur les bus SNCB (FAQ)\nOù prendre mon bus ?",
+   "type": "planned",
+   "link": "https://www.belgiantrain.be/fr/support/faq/faq-routes-schedules/faq-bus",
+   "timestamp": "1791531538",
+   "richtext": "Du 17 au 25/10, Infrabel effectue des travaux.\n\nTous les trains sont remplacés par des bus SNCB entre Charleroi-Central, Erquelinnes et Maubeuge (FR).\nAttention, ces bus ne font pas arrêt à Hourpes.\n\nLe planificateur de voyages tient déjà compte de ces adaptations. Les temps de parcours des bus SNCB peuvent varier selon la densité du trafic. Ceci peut entraîner des temps de trajet plus longs.\n\nEn savoir plus sur les bus SNCB (FAQ)\nOù prendre mon bus ?",
+   "descriptionLinks": {
+    "number": "2",
+    "descriptionLink": [
+     {
+      "id": "0",
+      "link": "https://www.belgiantrain.be/fr/support/faq/faq-routes-schedules/faq-bus",
+      "text": "En savoir plus sur les bus SNCB (FAQ)"
+     },
+     {
+      "id": "1",
+      "link": "https://www.belgianrail.be/jp/download/brail_him/1791531537861_FR_2610002_S.pdf",
+      "text": "Où prendre mon bus ? "
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -21,8 +21,18 @@ export const zones = [
     name: 'Salon',
     type: 'HEATING',
     devices: [
-      { deviceType: 'RU02', serialNo: 'RU1', batteryState: 'NORMAL', connectionState: { value: true } },
-      { deviceType: 'VA02', serialNo: 'VA1', batteryState: 'LOW', connectionState: { value: true } },
+      {
+        deviceType: 'RU02',
+        serialNo: 'RU1',
+        batteryState: 'NORMAL',
+        connectionState: { value: true },
+      },
+      {
+        deviceType: 'VA02',
+        serialNo: 'VA1',
+        batteryState: 'LOW',
+        connectionState: { value: true },
+      },
     ],
     openWindowDetection: { supported: true, enabled: true, timeoutInSeconds: 900 },
   },
@@ -30,7 +40,14 @@ export const zones = [
     id: 2,
     name: 'Chambre',
     type: 'HEATING',
-    devices: [{ deviceType: 'VA02', serialNo: 'VA2', batteryState: 'NORMAL', connectionState: { value: true } }],
+    devices: [
+      {
+        deviceType: 'VA02',
+        serialNo: 'VA2',
+        batteryState: 'NORMAL',
+        connectionState: { value: true },
+      },
+    ],
   },
   {
     id: 3,
@@ -53,11 +70,21 @@ export const zoneStates = (overrides = {}) => ({
       },
       openWindow: null,
       openWindowDetected: false,
-      nextScheduleChange: { start: '2026-10-13T21:00:00Z', setting: { type: 'HEATING', power: 'ON', temperature: { celsius: 18 } } },
+      nextScheduleChange: {
+        start: '2026-10-13T21:00:00Z',
+        setting: { type: 'HEATING', power: 'ON', temperature: { celsius: 18 } },
+      },
       link: { state: 'ONLINE' },
-      activityDataPoints: { heatingPower: { type: 'PERCENTAGE', percentage: 42.0, timestamp: '2026-10-13T12:00:00Z' } },
+      activityDataPoints: {
+        heatingPower: { type: 'PERCENTAGE', percentage: 42.0, timestamp: '2026-10-13T12:00:00Z' },
+      },
       sensorDataPoints: {
-        insideTemperature: { celsius: 20.37, fahrenheit: 68.67, timestamp: '2026-10-13T12:00:00Z', precision: { celsius: 0.1 } },
+        insideTemperature: {
+          celsius: 20.37,
+          fahrenheit: 68.67,
+          timestamp: '2026-10-13T12:00:00Z',
+          precision: { celsius: 0.1 },
+        },
         humidity: { type: 'PERCENTAGE', percentage: 55.3, timestamp: '2026-10-13T12:00:00Z' },
       },
       ...(overrides[1] ?? {}),
@@ -90,7 +117,10 @@ export const zoneStates = (overrides = {}) => ({
   },
 });
 
-export const homeState = (presence = 'HOME', presenceLocked = false) => ({ presence, presenceLocked });
+export const homeState = (presence = 'HOME', presenceLocked = false) => ({
+  presence,
+  presenceLocked,
+});
 
 export const weather = {
   solarIntensity: { type: 'PERCENTAGE', percentage: 61.2 },
@@ -99,8 +129,18 @@ export const weather = {
 };
 
 export const mobileDevices = [
-  { id: 11, name: 'Phone Jane', settings: { geoTrackingEnabled: true }, location: { stale: false, atHome: true } },
+  {
+    id: 11,
+    name: 'Phone Jane',
+    settings: { geoTrackingEnabled: true },
+    location: { stale: false, atHome: true },
+  },
   { id: 12, name: 'Tablet', settings: { geoTrackingEnabled: false } },
 ];
 
-export const tokens = { access_token: 'acc1', refresh_token: 'ref1', expires_in: 599, token_type: 'bearer' };
+export const tokens = {
+  access_token: 'acc1',
+  refresh_token: 'ref1',
+  expires_in: 599,
+  token_type: 'bearer',
+};

@@ -55,4 +55,4 @@ export const OPENING_SENSOR_STATE = { OPEN: 0, CLOSE: 1 };
 export const PRESENCE = { AUTO: 'auto', HOME: 'home', AWAY: 'away' };
 
 /** How a manual setpoint ends. */
-export const TERMINATION = { MANUAL: 'manual', NEXT_TIME_BLOCK: 'next_time_block', TIMER: 'timer' };
+export const TERMINATION = { NEXT_TIME_BLOCK: 'next_time_block', TIMER: 'timer', MANUAL: 'manual' };

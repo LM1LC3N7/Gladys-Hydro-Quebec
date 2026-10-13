@@ -47,7 +47,10 @@ export function zoneFromV2(zone, state = {}) {
     generation: GENERATIONS.V2,
     power,
     targetTemperature: power ? num(setting.temperature?.celsius) : null,
-    canSetTemperature: type !== ZONE_TYPES.HOT_WATER || setting.temperature !== undefined,
+    canSetTemperature:
+      type !== ZONE_TYPES.HOT_WATER ||
+      (zone.canSetTemperature ??
+        (setting.temperature !== null && setting.temperature !== undefined)),
     temperature: round1(num(sensors.insideTemperature?.celsius)),
     humidity: round1(num(sensors.humidity?.percentage)),
     heatingPower,

@@ -3,7 +3,18 @@ export const home = { id: 5678, name: 'Loft', dateTimeZone: 'Europe/Berlin', gen
 
 export const roomsAndDevices = {
   rooms: [
-    { roomId: 7, roomName: 'Studio', devices: [{ serialNumber: 'X1', type: 'VA04', batteryState: 'NORMAL', connection: { state: 'ONLINE' } }] },
+    {
+      roomId: 7,
+      roomName: 'Studio',
+      devices: [
+        {
+          serialNumber: 'X1',
+          type: 'VA04',
+          batteryState: 'NORMAL',
+          connection: { state: 'ONLINE' },
+        },
+      ],
+    },
   ],
   otherDevices: [{ serialNumber: 'IB1', type: 'IB02' }],
 };
