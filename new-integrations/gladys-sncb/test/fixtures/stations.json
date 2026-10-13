@@ -1,86 +1,86 @@
 {
- "version": "1.4",
- "timestamp": "1791896251",
- "station": [
-  {
-   "@id": "http://irail.be/stations/NMBS/008821006",
-   "id": "BE.NMBS.008821006",
-   "name": "Anvers-Central",
-   "locationX": "4.421101",
-   "locationY": "51.2172",
-   "standardname": "Antwerpen-Centraal"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008813003",
-   "id": "BE.NMBS.008813003",
-   "name": "Bruxelles-Central",
-   "locationX": "4.356801",
-   "locationY": "50.845658",
-   "standardname": "Brussel-Centraal/Bruxelles-Central"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008811304",
-   "id": "BE.NMBS.008811304",
-   "name": "Bruxelles-Luxembourg",
-   "locationX": "4.373674",
-   "locationY": "50.838943",
-   "standardname": "Brussel-Luxemburg/Bruxelles-Luxembourg"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008814001",
-   "id": "BE.NMBS.008814001",
-   "name": "Bruxelles-Midi",
-   "locationX": "4.336531",
-   "locationY": "50.835707",
-   "standardname": "Brussel-Zuid/Bruxelles-Midi"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008864501",
-   "id": "BE.NMBS.008864501",
-   "name": "Ciney",
-   "locationX": "5.091409",
-   "locationY": "50.29105",
-   "standardname": "Ciney"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008863503",
-   "id": "BE.NMBS.008863503",
-   "name": "Dinant",
-   "locationX": "4.908182",
-   "locationY": "50.260721",
-   "standardname": "Dinant"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008892007",
-   "id": "BE.NMBS.008892007",
-   "name": "Gand-Saint-Pierre",
-   "locationX": "3.710675",
-   "locationY": "51.035896",
-   "standardname": "Gent-Sint-Pieters"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008841004",
-   "id": "BE.NMBS.008841004",
-   "name": "Liège-Guillemins",
-   "locationX": "5.566695",
-   "locationY": "50.62455",
-   "standardname": "Liège-Guillemins"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008863008",
-   "id": "BE.NMBS.008863008",
-   "name": "Namur",
-   "locationX": "4.86222",
-   "locationY": "50.468794",
-   "standardname": "Namur"
-  },
-  {
-   "@id": "http://irail.be/stations/NMBS/008885001",
-   "id": "BE.NMBS.008885001",
-   "name": "Tournai",
-   "locationX": "3.396942",
-   "locationY": "50.613134",
-   "standardname": "Tournai"
-  }
- ]
+  "version": "1.4",
+  "timestamp": "1791896251",
+  "station": [
+    {
+      "@id": "http://irail.be/stations/NMBS/008821006",
+      "id": "BE.NMBS.008821006",
+      "name": "Anvers-Central",
+      "locationX": "4.421101",
+      "locationY": "51.2172",
+      "standardname": "Antwerpen-Centraal"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008813003",
+      "id": "BE.NMBS.008813003",
+      "name": "Bruxelles-Central",
+      "locationX": "4.356801",
+      "locationY": "50.845658",
+      "standardname": "Brussel-Centraal/Bruxelles-Central"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008811304",
+      "id": "BE.NMBS.008811304",
+      "name": "Bruxelles-Luxembourg",
+      "locationX": "4.373674",
+      "locationY": "50.838943",
+      "standardname": "Brussel-Luxemburg/Bruxelles-Luxembourg"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008814001",
+      "id": "BE.NMBS.008814001",
+      "name": "Bruxelles-Midi",
+      "locationX": "4.336531",
+      "locationY": "50.835707",
+      "standardname": "Brussel-Zuid/Bruxelles-Midi"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008864501",
+      "id": "BE.NMBS.008864501",
+      "name": "Ciney",
+      "locationX": "5.091409",
+      "locationY": "50.29105",
+      "standardname": "Ciney"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008863503",
+      "id": "BE.NMBS.008863503",
+      "name": "Dinant",
+      "locationX": "4.908182",
+      "locationY": "50.260721",
+      "standardname": "Dinant"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008892007",
+      "id": "BE.NMBS.008892007",
+      "name": "Gand-Saint-Pierre",
+      "locationX": "3.710675",
+      "locationY": "51.035896",
+      "standardname": "Gent-Sint-Pieters"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008841004",
+      "id": "BE.NMBS.008841004",
+      "name": "Liège-Guillemins",
+      "locationX": "5.566695",
+      "locationY": "50.62455",
+      "standardname": "Liège-Guillemins"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008863008",
+      "id": "BE.NMBS.008863008",
+      "name": "Namur",
+      "locationX": "4.86222",
+      "locationY": "50.468794",
+      "standardname": "Namur"
+    },
+    {
+      "@id": "http://irail.be/stations/NMBS/008885001",
+      "id": "BE.NMBS.008885001",
+      "name": "Tournai",
+      "locationX": "3.396942",
+      "locationY": "50.613134",
+      "standardname": "Tournai"
+    }
+  ]
 }

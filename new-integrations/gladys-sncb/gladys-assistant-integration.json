@@ -1,0 +1,464 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "SNCB / NMBS",
+  "description": {
+    "en": "Unofficial connector: next SNCB trains per station, delays, cancellations and disturbances.",
+    "fr": "Connecteur non officiel : prochains trains SNCB par gare, retards, suppressions et perturbations."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-sncb:0.1.0",
+  "gladys_version": ">=5.1.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-sncb/main/cover.png",
+  "categories": ["services"],
+  "transports": ["cloud"],
+  "location": true,
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": { "en": "Belgian trains in Gladys", "fr": "Les trains belges dans Gladys" },
+      "description": {
+        "en": "Unofficial connector, not affiliated with SNCB/NMBS or iRail. It reads the public iRail API (no account, no key): one device per watched station with its next departures (train, destination, platform, delay, cancellation), a network device with the current disturbances, scene triggers when a train approaches, is delayed, canceled or changes platform, and two dashboard widgets. The stations closest to your house are suggested in Discovery; add others below.",
+        "fr": "Connecteur non officiel, sans lien avec la SNCB/NMBS ni iRail. Il lit l'API publique iRail (sans compte ni clé) : un appareil par gare suivie avec ses prochains départs (train, destination, voie, retard, suppression), un appareil réseau avec les perturbations en cours, des déclencheurs de scène quand un train approche, est retardé, supprimé ou change de voie, et deux widgets. Les gares les plus proches de votre maison sont proposées dans Découverte ; ajoutez-en d'autres ci-dessous."
+      },
+      "links": [
+        {
+          "url": "https://www.belgiantrain.be/",
+          "label": { "en": "SNCB / NMBS", "fr": "SNCB / NMBS" }
+        },
+        {
+          "url": "https://docs.irail.be/",
+          "label": {
+            "en": "iRail (the API this integration relies on)",
+            "fr": "iRail (l'API utilisée par cette intégration)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-sncb/blob/main/docs/fr.md",
+          "label": { "en": "Guide (French)", "fr": "Guide (français)" }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-sncb/blob/main/docs/en.md",
+          "label": { "en": "Guide (English)", "fr": "Guide (anglais)" }
+        }
+      ]
+    },
+    {
+      "key": "nearby_stations",
+      "type": "number",
+      "label": {
+        "en": "Stations near my home (suggested in Discovery)",
+        "fr": "Gares près de chez moi (proposées dans Découverte)"
+      },
+      "required": false,
+      "default": 2,
+      "min": 0,
+      "max": 5
+    },
+    {
+      "key": "stations",
+      "type": "string",
+      "label": { "en": "Stations to watch", "fr": "Gares à suivre" },
+      "description": {
+        "en": "Station names or iRail ids, separated by commas. Optional destination filter after @ (several with |) and custom name after : — e.g. \"Namur, Bruxelles-Central@Namur|Dinant:Train home\".",
+        "fr": "Noms de gares ou identifiants iRail, séparés par des virgules. Filtre de destination facultatif après @ (plusieurs avec |) et nom personnalisé après : — ex. « Namur, Bruxelles-Central@Namur|Dinant:Train du retour »."
+      },
+      "required": false,
+      "placeholder": {
+        "en": "Namur, Bruxelles-Central@Namur:Train home",
+        "fr": "Namur, Bruxelles-Central@Namur:Train du retour"
+      }
+    },
+    {
+      "key": "max_departures",
+      "type": "number",
+      "label": { "en": "Departures per station", "fr": "Départs par gare" },
+      "description": {
+        "en": "How many upcoming departures each station device exposes as features.",
+        "fr": "Nombre de prochains départs exposés en fonctionnalités par gare."
+      },
+      "required": false,
+      "default": 3,
+      "min": 1,
+      "max": 5
+    },
+    {
+      "key": "poll_frequency",
+      "type": "number",
+      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "description": {
+        "en": "How often each watched station is read. iRail is a community service: 60 s is plenty.",
+        "fr": "Fréquence de lecture de chaque gare suivie. iRail est un service communautaire : 60 s suffisent largement."
+      },
+      "required": false,
+      "default": 60,
+      "min": 30,
+      "max": 600
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the station and disturbance names",
+        "fr": "Langue des noms de gares et des perturbations"
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        { "value": "fr", "label": { "en": "French", "fr": "Français" } },
+        { "value": "nl", "label": { "en": "Dutch", "fr": "Néerlandais" } },
+        { "value": "en", "label": { "en": "English", "fr": "Anglais" } },
+        { "value": "de", "label": { "en": "German", "fr": "Allemand" } }
+      ]
+    },
+    {
+      "key": "watch_disturbances",
+      "type": "boolean",
+      "label": {
+        "en": "Offer the \"SNCB network\" device (disturbances)",
+        "fr": "Proposer l'appareil « Réseau SNCB » (perturbations)"
+      },
+      "required": false,
+      "default": true
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": { "en": "Test iRail", "fr": "Tester iRail" },
+      "description": {
+        "en": "Reads the station list and checks the stations typed above.",
+        "fr": "Lit la liste des gares et vérifie les gares saisies ci-dessus."
+      }
+    },
+    {
+      "key": "search_stations",
+      "timeout_seconds": 30,
+      "label": { "en": "Search stations", "fr": "Chercher des gares" },
+      "description": {
+        "en": "Finds the stations whose name contains the text, with their iRail id.",
+        "fr": "Trouve les gares dont le nom contient le texte, avec leur identifiant iRail."
+      },
+      "fields": [
+        {
+          "key": "query",
+          "type": "string",
+          "required": true,
+          "label": { "en": "Part of the name", "fr": "Partie du nom" },
+          "placeholder": { "en": "Bruxelles", "fr": "Bruxelles" }
+        }
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "key": "departures",
+      "label": { "en": "SNCB departures", "fr": "Départs SNCB" },
+      "description": {
+        "en": "The next trains of a watched station: time, countdown, delay, platform.",
+        "fr": "Les prochains trains d'une gare suivie : heure, compte à rebours, retard, voie."
+      },
+      "icon": "navigation",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": { "en": "Station", "fr": "Gare" }
+        }
+      ]
+    },
+    {
+      "key": "disturbances",
+      "label": { "en": "SNCB disturbances", "fr": "Perturbations SNCB" },
+      "description": {
+        "en": "The current disturbances and planned works of the network.",
+        "fr": "Les perturbations en cours et travaux prévus sur le réseau."
+      },
+      "icon": "alert-triangle"
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "departure_approaching",
+      "label": { "en": "SNCB train approaching", "fr": "Train SNCB imminent" },
+      "description": {
+        "en": "A train of a watched station now leaves in less than the chosen number of minutes.",
+        "fr": "Un train d'une gare suivie part désormais dans moins du nombre de minutes choisi."
+      },
+      "fields": [
+        {
+          "key": "station",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": { "en": "Station", "fr": "Gare" }
+        },
+        {
+          "key": "threshold",
+          "type": "select",
+          "required": true,
+          "label": { "en": "Minutes before departure", "fr": "Minutes avant le départ" },
+          "options": [
+            { "value": "1", "label": { "en": "1 minute", "fr": "1 minute" } },
+            { "value": "2", "label": { "en": "2 minutes", "fr": "2 minutes" } },
+            { "value": "3", "label": { "en": "3 minutes", "fr": "3 minutes" } },
+            { "value": "5", "label": { "en": "5 minutes", "fr": "5 minutes" } },
+            { "value": "10", "label": { "en": "10 minutes", "fr": "10 minutes" } },
+            { "value": "15", "label": { "en": "15 minutes", "fr": "15 minutes" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "train", "type": "string", "label": { "en": "Train", "fr": "Train" } },
+        {
+          "key": "destination",
+          "type": "string",
+          "label": { "en": "Destination", "fr": "Destination" }
+        },
+        { "key": "platform", "type": "string", "label": { "en": "Platform", "fr": "Voie" } },
+        {
+          "key": "delay",
+          "type": "number",
+          "label": { "en": "Delay (min)", "fr": "Retard (min)" }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": { "en": "Minutes before departure", "fr": "Minutes avant le départ" }
+        },
+        {
+          "key": "scheduled_at",
+          "type": "string",
+          "label": { "en": "Scheduled departure (ISO)", "fr": "Départ prévu (ISO)" }
+        },
+        {
+          "key": "expected_at",
+          "type": "string",
+          "label": { "en": "Expected departure (ISO)", "fr": "Départ attendu (ISO)" }
+        }
+      ]
+    },
+    {
+      "key": "train_disrupted",
+      "label": {
+        "en": "SNCB train delayed, canceled or moved",
+        "fr": "Train SNCB retardé, supprimé ou déplacé"
+      },
+      "description": {
+        "en": "A train of a watched station just got delayed by at least the chosen minutes, was canceled, or changed platform.",
+        "fr": "Un train d'une gare suivie vient d'être retardé d'au moins les minutes choisies, supprimé, ou a changé de voie."
+      },
+      "fields": [
+        {
+          "key": "station",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": { "en": "Station", "fr": "Gare" }
+        },
+        {
+          "key": "event",
+          "type": "select",
+          "required": true,
+          "label": { "en": "Event", "fr": "Événement" },
+          "options": [
+            { "value": "delayed", "label": { "en": "Delayed", "fr": "Retardé" } },
+            { "value": "canceled", "label": { "en": "Canceled", "fr": "Supprimé" } },
+            {
+              "value": "platform_changed",
+              "label": { "en": "Platform changed", "fr": "Changement de voie" }
+            }
+          ]
+        },
+        {
+          "key": "min_delay",
+          "type": "select",
+          "required": false,
+          "label": {
+            "en": "Delay of at least (for \"Delayed\")",
+            "fr": "Retard d'au moins (pour « Retardé »)"
+          },
+          "options": [
+            { "value": "5", "label": { "en": "5 minutes", "fr": "5 minutes" } },
+            { "value": "10", "label": { "en": "10 minutes", "fr": "10 minutes" } },
+            { "value": "15", "label": { "en": "15 minutes", "fr": "15 minutes" } },
+            { "value": "30", "label": { "en": "30 minutes", "fr": "30 minutes" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "event", "type": "string", "label": { "en": "Event", "fr": "Événement" } },
+        { "key": "train", "type": "string", "label": { "en": "Train", "fr": "Train" } },
+        {
+          "key": "destination",
+          "type": "string",
+          "label": { "en": "Destination", "fr": "Destination" }
+        },
+        { "key": "platform", "type": "string", "label": { "en": "Platform", "fr": "Voie" } },
+        {
+          "key": "delay",
+          "type": "number",
+          "label": { "en": "Delay (min)", "fr": "Retard (min)" }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": { "en": "Minutes before departure", "fr": "Minutes avant le départ" }
+        },
+        {
+          "key": "scheduled_at",
+          "type": "string",
+          "label": { "en": "Scheduled departure (ISO)", "fr": "Départ prévu (ISO)" }
+        }
+      ]
+    },
+    {
+      "key": "disturbance_published",
+      "label": { "en": "SNCB disturbance published", "fr": "Perturbation SNCB publiée" },
+      "description": {
+        "en": "The SNCB published a new disturbance or planned works notice (network device required).",
+        "fr": "La SNCB a publié une nouvelle perturbation ou un avis de travaux (appareil réseau requis)."
+      },
+      "fields": [
+        {
+          "key": "type",
+          "type": "select",
+          "required": false,
+          "label": { "en": "Type (empty: both)", "fr": "Type (vide : les deux)" },
+          "options": [
+            { "value": "disturbance", "label": { "en": "Disturbance", "fr": "Perturbation" } },
+            { "value": "planned", "label": { "en": "Planned works", "fr": "Travaux prévus" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "title", "type": "string", "label": { "en": "Title", "fr": "Titre" } },
+        {
+          "key": "description",
+          "type": "string",
+          "label": { "en": "Description", "fr": "Description" }
+        },
+        { "key": "link", "type": "string", "label": { "en": "Link", "fr": "Lien" } },
+        {
+          "key": "published_at",
+          "type": "string",
+          "label": { "en": "Published at (ISO)", "fr": "Publié à (ISO)" }
+        }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "get_next_departures",
+      "label": { "en": "SNCB next departures", "fr": "SNCB prochains départs" },
+      "description": {
+        "en": "The next trains of a watched station, for a message or a condition that follows.",
+        "fr": "Les prochains trains d'une gare suivie, pour un message ou une condition qui suit."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": { "en": "Station", "fr": "Gare" }
+        }
+      ],
+      "outputs": [
+        { "key": "station", "type": "string", "label": { "en": "Station", "fr": "Gare" } },
+        {
+          "key": "count",
+          "type": "number",
+          "label": { "en": "Departures found", "fr": "Départs trouvés" }
+        },
+        {
+          "key": "list",
+          "type": "string",
+          "label": { "en": "Departures, one per line", "fr": "Départs, un par ligne" }
+        },
+        {
+          "key": "next_train",
+          "type": "string",
+          "label": { "en": "Next train", "fr": "Prochain train" }
+        },
+        {
+          "key": "next_destination",
+          "type": "string",
+          "label": { "en": "Next destination", "fr": "Prochaine destination" }
+        },
+        {
+          "key": "next_minutes",
+          "type": "number",
+          "label": {
+            "en": "Minutes before the next departure",
+            "fr": "Minutes avant le prochain départ"
+          }
+        },
+        {
+          "key": "next_delay",
+          "type": "number",
+          "label": { "en": "Delay of the next train (min)", "fr": "Retard du prochain train (min)" }
+        },
+        {
+          "key": "next_platform",
+          "type": "string",
+          "label": { "en": "Platform of the next train", "fr": "Voie du prochain train" }
+        },
+        {
+          "key": "next_time",
+          "type": "string",
+          "label": {
+            "en": "Scheduled time of the next train (ISO)",
+            "fr": "Heure prévue du prochain train (ISO)"
+          }
+        },
+        {
+          "key": "delayed_count",
+          "type": "number",
+          "label": { "en": "Delayed trains", "fr": "Trains retardés" }
+        },
+        {
+          "key": "canceled_count",
+          "type": "number",
+          "label": { "en": "Canceled trains", "fr": "Trains supprimés" }
+        }
+      ]
+    },
+    {
+      "key": "get_disturbances",
+      "label": { "en": "SNCB disturbances", "fr": "SNCB perturbations" },
+      "description": {
+        "en": "The current disturbances of the network, for a message or a condition that follows.",
+        "fr": "Les perturbations en cours sur le réseau, pour un message ou une condition qui suit."
+      },
+      "timeout_seconds": 20,
+      "outputs": [
+        {
+          "key": "count",
+          "type": "number",
+          "label": { "en": "Disturbances", "fr": "Perturbations" }
+        },
+        {
+          "key": "planned_count",
+          "type": "number",
+          "label": { "en": "Planned works", "fr": "Travaux prévus" }
+        },
+        {
+          "key": "titles",
+          "type": "string",
+          "label": { "en": "Titles, one per line", "fr": "Titres, un par ligne" }
+        },
+        {
+          "key": "latest",
+          "type": "string",
+          "label": { "en": "Latest disturbance", "fr": "Dernière perturbation" }
+        }
+      ]
+    }
+  ]
+}
