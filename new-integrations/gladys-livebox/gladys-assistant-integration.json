@@ -1,0 +1,542 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "Orange Livebox",
+  "description": {
+    "en": "Unofficial connector: Livebox Wi-Fi presence, internet link, Wi-Fi switches and missed calls, local.",
+    "fr": "Connecteur non officiel : présence Wi-Fi Livebox, internet, Wi-Fi et appels manqués, en local."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-livebox:0.1.0",
+  "gladys_version": ">=5.1.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-livebox/main/cover.png",
+  "categories": ["network"],
+  "transports": ["local"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": {
+        "en": "Orange Livebox",
+        "fr": "Livebox Orange"
+      },
+      "description": {
+        "en": "Unofficial connector, not affiliated with Orange. It talks to the Livebox on your local network (the same API as http://livebox/), no cloud: every device connected to the box becomes a presence sensor in Gladys, the box itself exposes the internet link, the Wi-Fi and guest Wi-Fi switches, the devices online and the missed calls of the landline. Works with the Livebox 3, 4, 5, 6 and 7. Livebox is a trademark of Orange.",
+        "fr": "Connecteur non officiel, sans lien avec Orange. Il parle à la Livebox sur votre réseau local (la même API que http://livebox/), sans cloud : chaque appareil connecté à la box devient un capteur de présence dans Gladys, la box elle-même expose la liaison internet, les interrupteurs Wi-Fi et Wi-Fi invité, les appareils en ligne et les appels manqués de la ligne fixe. Fonctionne avec les Livebox 3, 4, 5, 6 et 7. Livebox est une marque d'Orange."
+      },
+      "links": [
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-livebox/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-livebox/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "host",
+      "type": "string",
+      "required": false,
+      "default": "192.168.1.1",
+      "label": {
+        "en": "Livebox address",
+        "fr": "Adresse de la Livebox"
+      },
+      "description": {
+        "en": "The IP address or host name of the box on your network.",
+        "fr": "L'adresse IP ou le nom de la box sur votre réseau."
+      }
+    },
+    {
+      "key": "username",
+      "type": "string",
+      "required": false,
+      "default": "admin",
+      "label": {
+        "en": "User",
+        "fr": "Utilisateur"
+      }
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "required": true,
+      "label": {
+        "en": "Administration password",
+        "fr": "Mot de passe d'administration"
+      },
+      "description": {
+        "en": "The password of http://livebox/: by default the first 8 characters of the Wi-Fi key printed on the box. Stored encrypted by Gladys.",
+        "fr": "Le mot de passe de http://livebox/ : par défaut les 8 premiers caractères de la clé Wi-Fi imprimée sur la box. Stocké chiffré par Gladys."
+      }
+    },
+    {
+      "key": "poll_frequency",
+      "type": "number",
+      "required": false,
+      "default": 30,
+      "min": 10,
+      "max": 600,
+      "label": {
+        "en": "Refresh interval (s)",
+        "fr": "Intervalle de rafraîchissement (s)"
+      },
+      "description": {
+        "en": "How often the devices, the link and the calls are read.",
+        "fr": "Fréquence de lecture des appareils, de la liaison et des appels."
+      }
+    },
+    {
+      "key": "track_wired",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "label": {
+        "en": "Also offer the wired (Ethernet) devices as presence sensors",
+        "fr": "Proposer aussi les appareils filaires (Ethernet) comme capteurs de présence"
+      }
+    },
+    {
+      "key": "watch_calls",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "label": {
+        "en": "Read the call log of the landline (missed calls)",
+        "fr": "Lire le journal d'appels de la ligne fixe (appels manqués)"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion"
+      },
+      "description": {
+        "en": "Logs in to the Livebox and reads its model, firmware and internet state.",
+        "fr": "Se connecte à la Livebox et lit son modèle, son firmware et l'état d'internet."
+      }
+    },
+    {
+      "key": "reboot",
+      "timeout_seconds": 30,
+      "label": {
+        "en": "Reboot the Livebox",
+        "fr": "Redémarrer la Livebox"
+      },
+      "description": {
+        "en": "Restarts the box now (about 2 minutes without internet).",
+        "fr": "Redémarre la box maintenant (environ 2 minutes sans internet)."
+      }
+    }
+  ],
+  "widgets": [
+    {
+      "key": "network",
+      "label": {
+        "en": "Livebox",
+        "fr": "Livebox"
+      },
+      "description": {
+        "en": "Internet state, link, uptime, devices online, Wi-Fi and guest Wi-Fi buttons, missed calls.",
+        "fr": "Internet, liaison, durée de fonctionnement, appareils en ligne, boutons Wi-Fi, appels manqués."
+      },
+      "icon": "globe"
+    },
+    {
+      "key": "devices",
+      "label": {
+        "en": "Livebox devices",
+        "fr": "Appareils Livebox"
+      },
+      "description": {
+        "en": "The devices online right now, with their address and connection.",
+        "fr": "Les appareils en ligne en ce moment, avec leur adresse et leur connexion."
+      },
+      "icon": "monitor"
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "device_connected",
+      "label": {
+        "en": "Livebox: device connected",
+        "fr": "Livebox : appareil connecté"
+      },
+      "description": {
+        "en": "A tracked device joined the network (phone back home, TV turned on…).",
+        "fr": "Un appareil suivi a rejoint le réseau (téléphone de retour, TV allumée…)."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Device (empty: any tracked device)",
+            "fr": "Appareil (vide : tout appareil suivi)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Device name",
+            "fr": "Nom de l'appareil"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "IP address",
+            "fr": "Adresse IP"
+          }
+        },
+        {
+          "key": "mac",
+          "type": "string",
+          "label": {
+            "en": "MAC address",
+            "fr": "Adresse MAC"
+          }
+        },
+        {
+          "key": "interface",
+          "type": "string",
+          "label": {
+            "en": "wifi or ethernet",
+            "fr": "wifi ou ethernet"
+          }
+        }
+      ]
+    },
+    {
+      "key": "device_disconnected",
+      "label": {
+        "en": "Livebox: device disconnected",
+        "fr": "Livebox : appareil déconnecté"
+      },
+      "description": {
+        "en": "A tracked device left the network.",
+        "fr": "Un appareil suivi a quitté le réseau."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Device (empty: any tracked device)",
+            "fr": "Appareil (vide : tout appareil suivi)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Device name",
+            "fr": "Nom de l'appareil"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "IP address",
+            "fr": "Adresse IP"
+          }
+        },
+        {
+          "key": "mac",
+          "type": "string",
+          "label": {
+            "en": "MAC address",
+            "fr": "Adresse MAC"
+          }
+        },
+        {
+          "key": "interface",
+          "type": "string",
+          "label": {
+            "en": "wifi or ethernet",
+            "fr": "wifi ou ethernet"
+          }
+        }
+      ]
+    },
+    {
+      "key": "missed_call",
+      "label": {
+        "en": "Livebox: missed call",
+        "fr": "Livebox : appel manqué"
+      },
+      "description": {
+        "en": "A call on the landline was not answered (read from the call log at every refresh).",
+        "fr": "Un appel sur la ligne fixe n'a pas été décroché (lu dans le journal à chaque rafraîchissement)."
+      },
+      "fields": [],
+      "variables": [
+        {
+          "key": "number",
+          "type": "string",
+          "label": {
+            "en": "Caller number",
+            "fr": "Numéro de l'appelant"
+          }
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Caller name (if known)",
+            "fr": "Nom de l'appelant (si connu)"
+          }
+        },
+        {
+          "key": "started_at",
+          "type": "string",
+          "label": {
+            "en": "Call time (ISO)",
+            "fr": "Heure de l'appel (ISO)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "internet_changed",
+      "label": {
+        "en": "Livebox: internet up or down",
+        "fr": "Livebox : internet rétabli ou coupé"
+      },
+      "description": {
+        "en": "The internet link of the box went down or came back.",
+        "fr": "La liaison internet de la box est tombée ou est revenue."
+      },
+      "fields": [
+        {
+          "key": "state",
+          "type": "select",
+          "required": false,
+          "label": {
+            "en": "Change (empty: both)",
+            "fr": "Changement (vide : les deux)"
+          },
+          "options": [
+            {
+              "value": "up",
+              "label": {
+                "en": "Came back",
+                "fr": "Rétabli"
+              }
+            },
+            {
+              "value": "down",
+              "label": {
+                "en": "Went down",
+                "fr": "Coupé"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "state",
+          "type": "string",
+          "label": {
+            "en": "up or down",
+            "fr": "up ou down"
+          }
+        },
+        {
+          "key": "link_type",
+          "type": "string",
+          "label": {
+            "en": "Link type",
+            "fr": "Type de liaison"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "Public IP",
+            "fr": "IP publique"
+          }
+        },
+        {
+          "key": "error",
+          "type": "string",
+          "label": {
+            "en": "Last connection error",
+            "fr": "Dernière erreur de connexion"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "get_devices",
+      "label": {
+        "en": "Livebox: devices online",
+        "fr": "Livebox : appareils en ligne"
+      },
+      "description": {
+        "en": "How many devices are online and their names, for a condition or a message.",
+        "fr": "Combien d'appareils sont en ligne et leurs noms, pour une condition ou un message."
+      },
+      "timeout_seconds": 20,
+      "outputs": [
+        {
+          "key": "online",
+          "type": "number",
+          "label": {
+            "en": "Devices online",
+            "fr": "Appareils en ligne"
+          }
+        },
+        {
+          "key": "wifi_online",
+          "type": "number",
+          "label": {
+            "en": "Wi-Fi devices online",
+            "fr": "Appareils Wi-Fi en ligne"
+          }
+        },
+        {
+          "key": "names",
+          "type": "string",
+          "label": {
+            "en": "Names, comma separated",
+            "fr": "Noms, séparés par des virgules"
+          }
+        },
+        {
+          "key": "internet",
+          "type": "boolean",
+          "label": {
+            "en": "Internet connected",
+            "fr": "Internet connecté"
+          }
+        }
+      ]
+    },
+    {
+      "key": "set_wifi",
+      "label": {
+        "en": "Livebox: Wi-Fi on / off",
+        "fr": "Livebox : Wi-Fi on / off"
+      },
+      "description": {
+        "en": "Turns the Wi-Fi or the guest Wi-Fi on or off (night mode, guests arriving…).",
+        "fr": "Active ou désactive le Wi-Fi ou le Wi-Fi invité (mode nuit, arrivée d'invités…)."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "network",
+          "type": "select",
+          "required": true,
+          "default": "main",
+          "label": {
+            "en": "Network",
+            "fr": "Réseau"
+          },
+          "options": [
+            {
+              "value": "main",
+              "label": {
+                "en": "Wi-Fi",
+                "fr": "Wi-Fi"
+              }
+            },
+            {
+              "value": "guest",
+              "label": {
+                "en": "Guest Wi-Fi",
+                "fr": "Wi-Fi invité"
+              }
+            }
+          ]
+        },
+        {
+          "key": "state",
+          "type": "select",
+          "required": true,
+          "default": "on",
+          "label": {
+            "en": "State",
+            "fr": "État"
+          },
+          "options": [
+            {
+              "value": "on",
+              "label": {
+                "en": "On",
+                "fr": "Activé"
+              }
+            },
+            {
+              "value": "off",
+              "label": {
+                "en": "Off",
+                "fr": "Désactivé"
+              }
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "key": "enabled",
+          "type": "boolean",
+          "label": {
+            "en": "Enabled after the change",
+            "fr": "Activé après le changement"
+          }
+        }
+      ]
+    },
+    {
+      "key": "reboot",
+      "label": {
+        "en": "Livebox: reboot",
+        "fr": "Livebox : redémarrer"
+      },
+      "description": {
+        "en": "Restarts the box (for a watchdog scene: internet down for 10 minutes → reboot).",
+        "fr": "Redémarre la box (pour une scène de surveillance : internet coupé depuis 10 minutes → redémarrage)."
+      },
+      "timeout_seconds": 30,
+      "outputs": [
+        {
+          "key": "requested",
+          "type": "boolean",
+          "label": {
+            "en": "Reboot requested",
+            "fr": "Redémarrage demandé"
+          }
+        }
+      ]
+    }
+  ]
+}

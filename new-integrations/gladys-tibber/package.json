@@ -1,0 +1,34 @@
+{
+  "name": "gladys-tibber",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tibber for Gladys Assistant: electricity prices and levels, cheap hours, consumption and cost, Tibber Pulse live power, scene triggers, a dashboard widget and a delegated energy contract.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test",
+    "audit": "npm audit --omit=dev"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LM1LC3N7/gladys-tibber.git"
+  },
+  "dependencies": {
+    "@gladysassistant/integration-sdk": "^0.15.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10"
+  },
+  "license": "Apache-2.0"
+}

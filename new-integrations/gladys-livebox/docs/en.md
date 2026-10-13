@@ -1,0 +1,75 @@
+# Orange Livebox
+
+**Unofficial connector, not affiliated with Orange.** It talks to your Livebox
+on the local network, through the same API the box's administration page
+(http://livebox/) uses: nothing leaves your home. Works with the Livebox 3, 4,
+5, 6 and 7 (Sagemcom / Sercomm firmware). Livebox is a trademark of Orange.
+
+## What you get
+
+| Surface                            | Content                                                                                                                                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The **Livebox** device             | internet connected, link type (fiber, DSL), public IP, uptime, **Wi-Fi** and **guest Wi-Fi** switches, devices online (total and on Wi-Fi), missed calls and last call of the landline, and on a DSL box the download / upload rates |
+| One **presence sensor per device** | every phone, tablet, TV or computer the box knows on Wi-Fi (and on Ethernet if you ask), named like in the Livebox: the simplest "who is home" detection                                                                             |
+| Scene triggers                     | **device connected**, **device disconnected**, **missed call**, **internet up or down**                                                                                                                                              |
+| Scene actions                      | **devices online** (count and names), **Wi-Fi on / off** (main or guest), **reboot**                                                                                                                                                 |
+| Dashboard widgets                  | **Livebox** (state, link, uptime, counters, Wi-Fi buttons) and **Livebox devices** (who is online)                                                                                                                                   |
+
+## Setup
+
+1. Install the integration. The address `192.168.1.1` and the user `admin`
+   fit a standard Livebox; change them if yours differ.
+2. Type the **administration password**: the one you use on
+   http://livebox/. By default it is the first 8 characters of the Wi-Fi
+   key printed on the box (or the one you set in the Livebox settings).
+3. Save, click **Test the connection**: the model, firmware and internet
+   state are shown.
+4. Open **Discovery**: the Livebox and every Wi-Fi device it knows are
+   offered. Add the box and the devices you want to track (your phones for
+   presence, the TV for "when the TV turns on"…). Tick **wired devices** in
+   the configuration to offer the Ethernet ones too.
+5. Put the widgets on a dashboard.
+
+Everything is read every 30 seconds by default (**Refresh interval**); the
+box information every 10 minutes, the DSL line every 5.
+
+## Scenes
+
+- **Device connected / disconnected**: pick one of your tracked devices, or
+  leave it empty for any. "Phone connected" is the usual "I'm home"; add a
+  delay on the disconnection to absorb a phone going to sleep.
+- **Missed call**: the landline rang and nobody answered; the variables
+  carry the caller's number and name (when the box knows it). Send a
+  notification with `{{triggerEvent.data.number}}`.
+- **Internet up or down**: for a notification, or a watchdog scene: after
+  10 minutes down, run the **reboot** action.
+- The action **devices online** gives `{{online}}`, `{{wifi_online}}` and
+  `{{names}}`; **Wi-Fi on / off** switches the main or guest network (night
+  mode, guests arriving).
+
+The presence sensors are also plain Gladys presence sensors: they work
+with the "house empty" and "someone came back" built-in triggers and the
+alarm.
+
+## Troubleshooting
+
+- **"The Livebox refused the login"**: the password is the one of the
+  administration page, not the Wi-Fi key itself (its first 8 characters by
+  default). Some boxes block the login for a few minutes after several
+  failures.
+- **"The Livebox does not answer"**: check the address; the integration
+  runs in a container on the Gladys host, which must reach the box (same
+  LAN, or a route to it).
+- **A device never shows "away"**: the Livebox keeps a device "active" for
+  a while after it left (several minutes on Wi-Fi); phones in deep sleep can
+  also disappear and reappear. Use a delay in the scene.
+- **No download / upload rate**: those come from the xDSL line; a fiber
+  box reports the internet state and IP only.
+- **No missed calls**: the landline must be on the box (VoIP) and the call
+  log readable with this account; untick **Read the call log** otherwise.
+- Logs: the integration's log level is set with the `LOG_LEVEL` variable.
+
+## Privacy
+
+The password is stored encrypted by Gladys and only sent to the box on your
+LAN. The device names, addresses and call log stay in Gladys.

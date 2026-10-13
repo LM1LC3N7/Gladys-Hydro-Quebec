@@ -66,9 +66,10 @@ ce que le module apporte aux **scènes** et au **tableau de bord** de Gladys
 | 11 | MQTT discovery (format HA) | `gladys-mqtt-discovery` | P1 n° 110 : fait entrer d'un coup Tasmota, OpenMQTTGateway, Valetudo, rtl_433… | appareils génériques | élevée |
 | 12 | Discord | `gladys-discord` | P2 n° 215, canal de discussion bidirectionnel gratuit | chat avec Gladys, notifications | moyenne |
 
-Les cinq premiers sont construits dans ce dossier (ordre de livraison : IFTTT,
-tado°, Tibber, SNCB, Livebox). Les sept suivants sont prêts à être pris dans
-la foulée, sans doublon connu au 13 octobre.
+Les cinq premiers sont construits et poussés sur la branche `main` de leurs
+dépôts (`LM1LC3N7/gladys-ifttt`, `gladys-tado`, `gladys-sncb`, `gladys-tibber`,
+`gladys-livebox`) ; ce dossier en garde une copie. Les sept suivants sont
+prêts à être pris dans la foulée, sans doublon connu au 13 octobre.
 
 ## Description à donner à chaque dépôt GitHub
 
@@ -92,20 +93,19 @@ la foulée, sans doublon connu au 13 octobre.
   state and rates, guest Wi-Fi, missed calls, scene triggers. Local, no
   cloud. Unofficial, not affiliated with Orange.
 
-## Créer les dépôts
+## Publier chaque dépôt
 
-Pour chaque module, dans l'ordre :
+Les cinq dépôts existent et contiennent le code (commit initial sur `main`).
+Pour chacun :
 
-1. Créer le dépôt public `LM1LC3N7/<nom>` (description ci-dessus, licence
-   Apache-2.0, « Private vulnerability reporting » activé).
-2. Copier le contenu de `new-integrations/<nom>/` à la racine du dépôt
-   (fichiers cachés `.github/`, `.gitignore`, `.dockerignore`,
-   `.prettierrc.json` compris), puis `npm install`, `npm test`, commit.
-3. Lancer **Actions → Release → patch** : premier tag `0.1.0` → image sur
-   ghcr.io ; rendre le paquet public.
-4. Ajouter le topic `gladys-assistant-integration`, poster le fil
-   « Intégration externe - … » dans Développement, et répondre « je prends X »
-   dans le fil 10385 (tado°, IFTTT, Tibber, SNCB, Livebox).
+1. Vérifier que la CI du commit initial est verte (Actions → CI).
+2. Lancer **Actions → Release → patch** : premier tag `0.1.1` (la version de
+   départ est 0.1.0) → image multi-arch sur ghcr.io ; rendre le paquet
+   **public** dans les réglages du paquet.
+3. Ajouter le topic `gladys-assistant-integration` et activer « Private
+   vulnerability reporting » (SECURITY.md y renvoie).
+4. Poster le fil « Intégration externe - … » dans Développement, et répondre
+   « je prends X » dans le fil 10385 (tado°, IFTTT, Tibber, SNCB, Livebox).
 
 Chaque module a son `TODO.md` avec ce qu'il reste à vérifier sur une vraie
 instance et, pour les trois construits à l'aveugle (tado°, Livebox, Tibber

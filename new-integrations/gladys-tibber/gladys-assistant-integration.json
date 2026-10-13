@@ -1,0 +1,1139 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "Tibber",
+  "description": {
+    "en": "Unofficial connector: Tibber prices, cheap hours, consumption, Pulse live power and contracts.",
+    "fr": "Connecteur non officiel : prix Tibber, heures creuses, consommation, puissance Pulse et contrats."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-tibber:0.1.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-tibber/main/cover.png",
+  "categories": ["energy"],
+  "transports": ["cloud"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": {
+        "en": "Tibber account",
+        "fr": "Compte Tibber"
+      },
+      "description": {
+        "en": "Unofficial connector, not affiliated with Tibber. Create a personal access token on developer.tibber.com (Settings → Access token) and paste it below: the integration discovers your homes, reads the hourly prices (today and tomorrow), your consumption, and, with a Tibber Pulse or Watty, the live power. It also offers a Tibber contract template for the Gladys energy monitoring. Tibber is a trademark of Tibber AS.",
+        "fr": "Connecteur non officiel, sans lien avec Tibber. Créez un jeton d'accès personnel sur developer.tibber.com (Settings → Access token) et collez-le ci-dessous : l'intégration découvre vos maisons, lit les prix horaires (aujourd'hui et demain), votre consommation et, avec un Tibber Pulse ou Watty, la puissance en direct. Elle fournit aussi un modèle de contrat Tibber pour le suivi énergétique de Gladys. Tibber est une marque de Tibber AS."
+      },
+      "links": [
+        {
+          "url": "https://developer.tibber.com/settings/access-token",
+          "label": {
+            "en": "Create an access token",
+            "fr": "Créer un jeton d'accès"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-tibber/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-tibber/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "access_token",
+      "type": "secret",
+      "required": true,
+      "label": {
+        "en": "Access token",
+        "fr": "Jeton d'accès"
+      },
+      "description": {
+        "en": "Stored encrypted by Gladys and only sent to api.tibber.com.",
+        "fr": "Stocké chiffré par Gladys et envoyé uniquement à api.tibber.com."
+      }
+    },
+    {
+      "key": "cheap_hours",
+      "type": "number",
+      "required": false,
+      "default": 4,
+      "min": 1,
+      "max": 12,
+      "label": {
+        "en": "Cheap hours per day",
+        "fr": "Heures creuses par jour"
+      },
+      "description": {
+        "en": "The N cheapest hours of the day make the \"cheap period\" (sensor, triggers, widget).",
+        "fr": "Les N heures les moins chères de la journée forment la « période creuse » (capteur, déclencheurs, widget)."
+      }
+    },
+    {
+      "key": "live",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "label": {
+        "en": "Live power from a Tibber Pulse / Watty",
+        "fr": "Puissance en direct d'un Tibber Pulse / Watty"
+      },
+      "description": {
+        "en": "Keeps a websocket open to Tibber for the homes with real-time consumption enabled.",
+        "fr": "Garde une connexion websocket ouverte vers Tibber pour les maisons dont la consommation en temps réel est activée."
+      }
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion"
+      },
+      "description": {
+        "en": "Reads the account and the current price of each home.",
+        "fr": "Lit le compte et le prix actuel de chaque maison."
+      }
+    }
+  ],
+  "widgets": [
+    {
+      "key": "prices",
+      "label": {
+        "en": "Tibber prices",
+        "fr": "Prix Tibber"
+      },
+      "description": {
+        "en": "Now, next, today's and tomorrow's average, the level, the cheapest hours and the price curve.",
+        "fr": "Maintenant, ensuite, moyennes du jour et de demain, niveau, heures creuses et courbe des prix."
+      },
+      "icon": "trending-down",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ]
+    },
+    {
+      "key": "live",
+      "label": {
+        "en": "Tibber live power",
+        "fr": "Puissance Tibber en direct"
+      },
+      "description": {
+        "en": "Power gauge, today's kWh and cost, peak, voltages and currents from the Pulse.",
+        "fr": "Jauge de puissance, kWh et coût du jour, pic, tensions et courants du Pulse."
+      },
+      "icon": "zap",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "cheap_period_started",
+      "label": {
+        "en": "Tibber cheap period started",
+        "fr": "Début des heures creuses Tibber"
+      },
+      "description": {
+        "en": "The current slot is one of the cheapest hours of the day (see \"Cheap hours per day\").",
+        "fr": "Le créneau actuel fait partie des heures les moins chères de la journée (voir « Heures creuses par jour »)."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "price",
+          "type": "number",
+          "label": {
+            "en": "Price per kWh",
+            "fr": "Prix par kWh"
+          }
+        },
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Price level",
+            "fr": "Niveau de prix"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "End of the slot",
+            "fr": "Fin du créneau"
+          }
+        }
+      ]
+    },
+    {
+      "key": "cheap_period_ended",
+      "label": {
+        "en": "Tibber cheap period ended",
+        "fr": "Fin des heures creuses Tibber"
+      },
+      "description": {
+        "en": "The current slot is no longer one of the cheapest hours of the day.",
+        "fr": "Le créneau actuel ne fait plus partie des heures les moins chères de la journée."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "price",
+          "type": "number",
+          "label": {
+            "en": "Price per kWh",
+            "fr": "Prix par kWh"
+          }
+        },
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Price level",
+            "fr": "Niveau de prix"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "End of the slot",
+            "fr": "Fin du créneau"
+          }
+        }
+      ]
+    },
+    {
+      "key": "price_level_changed",
+      "label": {
+        "en": "Tibber price level changed",
+        "fr": "Niveau de prix Tibber modifié"
+      },
+      "description": {
+        "en": "Tibber's level of the current price changed (very cheap to very expensive, against the last days).",
+        "fr": "Le niveau Tibber du prix actuel a changé (très bon marché à très cher, par rapport aux derniers jours)."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        },
+        {
+          "key": "level",
+          "type": "multi_select",
+          "required": false,
+          "label": {
+            "en": "New level (empty: any)",
+            "fr": "Nouveau niveau (vide : tous)"
+          },
+          "options": [
+            {
+              "value": "VERY_CHEAP",
+              "label": {
+                "en": "Very cheap",
+                "fr": "Très bon marché"
+              }
+            },
+            {
+              "value": "CHEAP",
+              "label": {
+                "en": "Cheap",
+                "fr": "Bon marché"
+              }
+            },
+            {
+              "value": "NORMAL",
+              "label": {
+                "en": "Normal",
+                "fr": "Normal"
+              }
+            },
+            {
+              "value": "EXPENSIVE",
+              "label": {
+                "en": "Expensive",
+                "fr": "Cher"
+              }
+            },
+            {
+              "value": "VERY_EXPENSIVE",
+              "label": {
+                "en": "Very expensive",
+                "fr": "Très cher"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "price",
+          "type": "number",
+          "label": {
+            "en": "Price per kWh",
+            "fr": "Prix par kWh"
+          }
+        },
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Price level",
+            "fr": "Niveau de prix"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "End of the slot",
+            "fr": "Fin du créneau"
+          }
+        },
+        {
+          "key": "previous_level",
+          "type": "string",
+          "label": {
+            "en": "Previous level",
+            "fr": "Niveau précédent"
+          }
+        }
+      ]
+    },
+    {
+      "key": "tomorrow_prices_published",
+      "label": {
+        "en": "Tibber tomorrow's prices published",
+        "fr": "Prix Tibber de demain publiés"
+      },
+      "description": {
+        "en": "Tomorrow's prices just appeared (around 13:00), with the average, the extremes and the cheapest window.",
+        "fr": "Les prix de demain viennent d'apparaître (vers 13 h), avec la moyenne, les extrêmes et la fenêtre la moins chère."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        },
+        {
+          "key": "average",
+          "type": "number",
+          "label": {
+            "en": "Average price",
+            "fr": "Prix moyen"
+          }
+        },
+        {
+          "key": "min",
+          "type": "number",
+          "label": {
+            "en": "Minimum price",
+            "fr": "Prix minimum"
+          }
+        },
+        {
+          "key": "max",
+          "type": "number",
+          "label": {
+            "en": "Maximum price",
+            "fr": "Prix maximum"
+          }
+        },
+        {
+          "key": "cheapest_start",
+          "type": "string",
+          "label": {
+            "en": "Cheapest hours start (ISO)",
+            "fr": "Début des heures les moins chères (ISO)"
+          }
+        },
+        {
+          "key": "cheapest_end",
+          "type": "string",
+          "label": {
+            "en": "Cheapest hours end (ISO)",
+            "fr": "Fin des heures les moins chères (ISO)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "power_threshold_crossed",
+      "label": {
+        "en": "Tibber live power crossed a mark",
+        "fr": "Puissance Tibber : seuil franchi"
+      },
+      "description": {
+        "en": "The live power of the Pulse went above or below the chosen number of watts.",
+        "fr": "La puissance en direct du Pulse est passée au-dessus ou en dessous du nombre de watts choisi."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        },
+        {
+          "key": "threshold",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Watts",
+            "fr": "Watts"
+          },
+          "options": [
+            {
+              "value": "500",
+              "label": {
+                "en": "500 W",
+                "fr": "500 W"
+              }
+            },
+            {
+              "value": "1000",
+              "label": {
+                "en": "1000 W",
+                "fr": "1000 W"
+              }
+            },
+            {
+              "value": "2000",
+              "label": {
+                "en": "2000 W",
+                "fr": "2000 W"
+              }
+            },
+            {
+              "value": "3000",
+              "label": {
+                "en": "3000 W",
+                "fr": "3000 W"
+              }
+            },
+            {
+              "value": "5000",
+              "label": {
+                "en": "5000 W",
+                "fr": "5000 W"
+              }
+            },
+            {
+              "value": "8000",
+              "label": {
+                "en": "8000 W",
+                "fr": "8000 W"
+              }
+            },
+            {
+              "value": "11000",
+              "label": {
+                "en": "11000 W",
+                "fr": "11000 W"
+              }
+            }
+          ]
+        },
+        {
+          "key": "direction",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Direction",
+            "fr": "Sens"
+          },
+          "options": [
+            {
+              "value": "above",
+              "label": {
+                "en": "Went above",
+                "fr": "Passée au-dessus"
+              }
+            },
+            {
+              "value": "below",
+              "label": {
+                "en": "Went below",
+                "fr": "Passée en dessous"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "power",
+          "type": "number",
+          "label": {
+            "en": "Power (W)",
+            "fr": "Puissance (W)"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "get_price",
+      "label": {
+        "en": "Tibber price now",
+        "fr": "Prix Tibber actuel"
+      },
+      "description": {
+        "en": "The current price, its level, whether it is in the cheap hours, the next price, today's figures and the cheapest window, for a condition or a message.",
+        "fr": "Le prix actuel, son niveau, s'il est dans les heures creuses, le prix suivant, les chiffres du jour et la fenêtre la moins chère, pour une condition ou un message."
+      },
+      "timeout_seconds": 10,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "available",
+          "type": "boolean",
+          "label": {
+            "en": "Prices known",
+            "fr": "Prix connus"
+          }
+        },
+        {
+          "key": "price",
+          "type": "number",
+          "label": {
+            "en": "Price per kWh",
+            "fr": "Prix par kWh"
+          }
+        },
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Price level",
+            "fr": "Niveau de prix"
+          }
+        },
+        {
+          "key": "cheap",
+          "type": "boolean",
+          "label": {
+            "en": "In the cheap hours",
+            "fr": "Dans les heures creuses"
+          }
+        },
+        {
+          "key": "ends_at",
+          "type": "string",
+          "label": {
+            "en": "End of the slot (ISO)",
+            "fr": "Fin du créneau (ISO)"
+          }
+        },
+        {
+          "key": "ends_time",
+          "type": "string",
+          "label": {
+            "en": "End of the slot (local time)",
+            "fr": "Fin du créneau (heure locale)"
+          }
+        },
+        {
+          "key": "next_price",
+          "type": "number",
+          "label": {
+            "en": "Next price",
+            "fr": "Prix suivant"
+          }
+        },
+        {
+          "key": "avg_price",
+          "type": "number",
+          "label": {
+            "en": "Today's average",
+            "fr": "Moyenne du jour"
+          }
+        },
+        {
+          "key": "min_price",
+          "type": "number",
+          "label": {
+            "en": "Today's minimum",
+            "fr": "Minimum du jour"
+          }
+        },
+        {
+          "key": "max_price",
+          "type": "number",
+          "label": {
+            "en": "Today's maximum",
+            "fr": "Maximum du jour"
+          }
+        },
+        {
+          "key": "tomorrow_published",
+          "type": "boolean",
+          "label": {
+            "en": "Tomorrow's prices published",
+            "fr": "Prix de demain publiés"
+          }
+        },
+        {
+          "key": "tomorrow_avg_price",
+          "type": "number",
+          "label": {
+            "en": "Tomorrow's average",
+            "fr": "Moyenne de demain"
+          }
+        },
+        {
+          "key": "window_start_time",
+          "type": "string",
+          "label": {
+            "en": "Cheapest window start (local time)",
+            "fr": "Début de la fenêtre la moins chère (heure locale)"
+          }
+        },
+        {
+          "key": "window_end_time",
+          "type": "string",
+          "label": {
+            "en": "Cheapest window end (local time)",
+            "fr": "Fin de la fenêtre la moins chère (heure locale)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "cheapest_window",
+      "label": {
+        "en": "Tibber cheapest hours",
+        "fr": "Heures Tibber les moins chères"
+      },
+      "description": {
+        "en": "The start and end of the cheapest N consecutive hours of a period, to wait for them or announce them.",
+        "fr": "Le début et la fin des N heures consécutives les moins chères d'une période, pour les attendre ou les annoncer."
+      },
+      "timeout_seconds": 10,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": true,
+          "label": {
+            "en": "Home",
+            "fr": "Maison"
+          }
+        },
+        {
+          "key": "hours",
+          "type": "number",
+          "required": false,
+          "min": 1,
+          "max": 12,
+          "label": {
+            "en": "Hours (empty: the configured cheap hours)",
+            "fr": "Heures (vide : les heures creuses configurées)"
+          }
+        },
+        {
+          "key": "period",
+          "type": "select",
+          "required": false,
+          "default": "next_24h",
+          "label": {
+            "en": "Period",
+            "fr": "Période"
+          },
+          "options": [
+            {
+              "value": "next_24h",
+              "label": {
+                "en": "The next 24 hours",
+                "fr": "Les 24 prochaines heures"
+              }
+            },
+            {
+              "value": "today",
+              "label": {
+                "en": "The rest of today",
+                "fr": "Le reste d'aujourd'hui"
+              }
+            },
+            {
+              "value": "tomorrow",
+              "label": {
+                "en": "Tomorrow",
+                "fr": "Demain"
+              }
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "key": "found",
+          "type": "boolean",
+          "label": {
+            "en": "A window was found",
+            "fr": "Une fenêtre a été trouvée"
+          }
+        },
+        {
+          "key": "start",
+          "type": "string",
+          "label": {
+            "en": "Start (ISO)",
+            "fr": "Début (ISO)"
+          }
+        },
+        {
+          "key": "end",
+          "type": "string",
+          "label": {
+            "en": "End (ISO)",
+            "fr": "Fin (ISO)"
+          }
+        },
+        {
+          "key": "start_time",
+          "type": "string",
+          "label": {
+            "en": "Start (local time)",
+            "fr": "Début (heure locale)"
+          }
+        },
+        {
+          "key": "end_time",
+          "type": "string",
+          "label": {
+            "en": "End (local time)",
+            "fr": "Fin (heure locale)"
+          }
+        },
+        {
+          "key": "minutes_until_start",
+          "type": "number",
+          "label": {
+            "en": "Minutes until the start",
+            "fr": "Minutes avant le début"
+          }
+        },
+        {
+          "key": "avg_price",
+          "type": "number",
+          "label": {
+            "en": "Average price of the window",
+            "fr": "Prix moyen de la fenêtre"
+          }
+        },
+        {
+          "key": "saving_percent",
+          "type": "number",
+          "label": {
+            "en": "Saving against the period average (%)",
+            "fr": "Économie par rapport à la moyenne de la période (%)"
+          }
+        },
+        {
+          "key": "currency",
+          "type": "string",
+          "label": {
+            "en": "Currency",
+            "fr": "Devise"
+          }
+        }
+      ]
+    }
+  ],
+  "energy_contracts": {
+    "templates": [
+      {
+        "key": "tibber-no",
+        "name": {
+          "en": "Tibber (Norway)",
+          "fr": "Tibber (Norvège)"
+        },
+        "description": {
+          "en": "Your Tibber hourly price (energy, VAT included) read from your account, plus the monthly subscription. The integration prices every half hour from the Tibber price history.",
+          "fr": "Votre prix horaire Tibber (énergie, TVA incluse) lu depuis votre compte, plus l'abonnement mensuel. L'intégration tarife chaque demi-heure depuis l'historique des prix Tibber."
+        },
+        "country": "NO",
+        "currency": "NOK",
+        "timezone": "Europe/Oslo",
+        "pricing_mode": "delegated",
+        "version": "2026-10-13",
+        "inputs": [
+          {
+            "key": "home_id",
+            "type": "string",
+            "required": false,
+            "label": {
+              "en": "Tibber home id (empty: the first home)",
+              "fr": "Identifiant de la maison Tibber (vide : la première)"
+            },
+            "description": {
+              "en": "Shown in the device params and by the test button; only needed with several homes.",
+              "fr": "Visible dans les paramètres de l'appareil et par le bouton de test ; utile seulement avec plusieurs maisons."
+            }
+          },
+          {
+            "key": "subscription",
+            "type": "number",
+            "unit": "NOK/month",
+            "default": 0,
+            "label": {
+              "en": "Monthly subscription",
+              "fr": "Abonnement mensuel"
+            },
+            "description": {
+              "en": "Tibber's monthly fee, added pro rata to the costs.",
+              "fr": "Le forfait mensuel de Tibber, ajouté au prorata aux coûts."
+            }
+          },
+          {
+            "key": "fallback_price",
+            "type": "number",
+            "unit": "NOK/kWh",
+            "default": 1,
+            "label": {
+              "en": "Price when Tibber has no price for an hour",
+              "fr": "Prix quand Tibber n'a pas de prix pour une heure"
+            }
+          }
+        ],
+        "tariff": {
+          "tariff_version": 1,
+          "components": [
+            {
+              "key": "subscription",
+              "kind": "fixed",
+              "label": "Subscription",
+              "amount": "{{input:subscription}}",
+              "per": "month"
+            }
+          ]
+        }
+      },
+      {
+        "key": "tibber-se",
+        "name": {
+          "en": "Tibber (Sweden)",
+          "fr": "Tibber (Suède)"
+        },
+        "description": {
+          "en": "Your Tibber hourly price (energy, VAT included) read from your account, plus the monthly subscription. The integration prices every half hour from the Tibber price history.",
+          "fr": "Votre prix horaire Tibber (énergie, TVA incluse) lu depuis votre compte, plus l'abonnement mensuel. L'intégration tarife chaque demi-heure depuis l'historique des prix Tibber."
+        },
+        "country": "SE",
+        "currency": "SEK",
+        "timezone": "Europe/Stockholm",
+        "pricing_mode": "delegated",
+        "version": "2026-10-13",
+        "inputs": [
+          {
+            "key": "home_id",
+            "type": "string",
+            "required": false,
+            "label": {
+              "en": "Tibber home id (empty: the first home)",
+              "fr": "Identifiant de la maison Tibber (vide : la première)"
+            },
+            "description": {
+              "en": "Shown in the device params and by the test button; only needed with several homes.",
+              "fr": "Visible dans les paramètres de l'appareil et par le bouton de test ; utile seulement avec plusieurs maisons."
+            }
+          },
+          {
+            "key": "subscription",
+            "type": "number",
+            "unit": "SEK/month",
+            "default": 0,
+            "label": {
+              "en": "Monthly subscription",
+              "fr": "Abonnement mensuel"
+            },
+            "description": {
+              "en": "Tibber's monthly fee, added pro rata to the costs.",
+              "fr": "Le forfait mensuel de Tibber, ajouté au prorata aux coûts."
+            }
+          },
+          {
+            "key": "fallback_price",
+            "type": "number",
+            "unit": "SEK/kWh",
+            "default": 1,
+            "label": {
+              "en": "Price when Tibber has no price for an hour",
+              "fr": "Prix quand Tibber n'a pas de prix pour une heure"
+            }
+          }
+        ],
+        "tariff": {
+          "tariff_version": 1,
+          "components": [
+            {
+              "key": "subscription",
+              "kind": "fixed",
+              "label": "Subscription",
+              "amount": "{{input:subscription}}",
+              "per": "month"
+            }
+          ]
+        }
+      },
+      {
+        "key": "tibber-de",
+        "name": {
+          "en": "Tibber (Germany)",
+          "fr": "Tibber (Allemagne)"
+        },
+        "description": {
+          "en": "Your Tibber hourly price (energy, VAT included) read from your account, plus the monthly subscription. The integration prices every half hour from the Tibber price history.",
+          "fr": "Votre prix horaire Tibber (énergie, TVA incluse) lu depuis votre compte, plus l'abonnement mensuel. L'intégration tarife chaque demi-heure depuis l'historique des prix Tibber."
+        },
+        "country": "DE",
+        "currency": "EUR",
+        "timezone": "Europe/Berlin",
+        "pricing_mode": "delegated",
+        "version": "2026-10-13",
+        "inputs": [
+          {
+            "key": "home_id",
+            "type": "string",
+            "required": false,
+            "label": {
+              "en": "Tibber home id (empty: the first home)",
+              "fr": "Identifiant de la maison Tibber (vide : la première)"
+            },
+            "description": {
+              "en": "Shown in the device params and by the test button; only needed with several homes.",
+              "fr": "Visible dans les paramètres de l'appareil et par le bouton de test ; utile seulement avec plusieurs maisons."
+            }
+          },
+          {
+            "key": "subscription",
+            "type": "number",
+            "unit": "EUR/month",
+            "default": 0,
+            "label": {
+              "en": "Monthly subscription",
+              "fr": "Abonnement mensuel"
+            },
+            "description": {
+              "en": "Tibber's monthly fee, added pro rata to the costs.",
+              "fr": "Le forfait mensuel de Tibber, ajouté au prorata aux coûts."
+            }
+          },
+          {
+            "key": "fallback_price",
+            "type": "number",
+            "unit": "EUR/kWh",
+            "default": 0.3,
+            "label": {
+              "en": "Price when Tibber has no price for an hour",
+              "fr": "Prix quand Tibber n'a pas de prix pour une heure"
+            }
+          }
+        ],
+        "tariff": {
+          "tariff_version": 1,
+          "components": [
+            {
+              "key": "subscription",
+              "kind": "fixed",
+              "label": "Subscription",
+              "amount": "{{input:subscription}}",
+              "per": "month"
+            }
+          ]
+        }
+      },
+      {
+        "key": "tibber-nl",
+        "name": {
+          "en": "Tibber (the Netherlands)",
+          "fr": "Tibber (Pays-Bas)"
+        },
+        "description": {
+          "en": "Your Tibber hourly price (energy, VAT included) read from your account, plus the monthly subscription. The integration prices every half hour from the Tibber price history.",
+          "fr": "Votre prix horaire Tibber (énergie, TVA incluse) lu depuis votre compte, plus l'abonnement mensuel. L'intégration tarife chaque demi-heure depuis l'historique des prix Tibber."
+        },
+        "country": "NL",
+        "currency": "EUR",
+        "timezone": "Europe/Amsterdam",
+        "pricing_mode": "delegated",
+        "version": "2026-10-13",
+        "inputs": [
+          {
+            "key": "home_id",
+            "type": "string",
+            "required": false,
+            "label": {
+              "en": "Tibber home id (empty: the first home)",
+              "fr": "Identifiant de la maison Tibber (vide : la première)"
+            },
+            "description": {
+              "en": "Shown in the device params and by the test button; only needed with several homes.",
+              "fr": "Visible dans les paramètres de l'appareil et par le bouton de test ; utile seulement avec plusieurs maisons."
+            }
+          },
+          {
+            "key": "subscription",
+            "type": "number",
+            "unit": "EUR/month",
+            "default": 0,
+            "label": {
+              "en": "Monthly subscription",
+              "fr": "Abonnement mensuel"
+            },
+            "description": {
+              "en": "Tibber's monthly fee, added pro rata to the costs.",
+              "fr": "Le forfait mensuel de Tibber, ajouté au prorata aux coûts."
+            }
+          },
+          {
+            "key": "fallback_price",
+            "type": "number",
+            "unit": "EUR/kWh",
+            "default": 0.3,
+            "label": {
+              "en": "Price when Tibber has no price for an hour",
+              "fr": "Prix quand Tibber n'a pas de prix pour une heure"
+            }
+          }
+        ],
+        "tariff": {
+          "tariff_version": 1,
+          "components": [
+            {
+              "key": "subscription",
+              "kind": "fixed",
+              "label": "Subscription",
+              "amount": "{{input:subscription}}",
+              "per": "month"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
