@@ -1,0 +1,284 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "tado°",
+  "description": {
+    "en": "Unofficial connector: tado° thermostats, hot water, home presence, open windows, scenes and widgets.",
+    "fr": "Connecteur non officiel : thermostats tado°, eau chaude, présence, fenêtres ouvertes, scènes et widgets."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-tado:0.1.0",
+  "gladys_version": ">=5.1.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-tado/main/cover.png",
+  "categories": ["climate"],
+  "transports": ["cloud"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": { "en": "tado° account", "fr": "Compte tado°" },
+      "description": {
+        "en": "Unofficial connector, not affiliated with tado. Click \"Link my tado° account\": a tado sign-in page opens, approve the access, and the integration discovers your homes and zones (V3+, V3, V2 thermostats and valves, hot water, air conditioning, and tado X rooms). The link stays valid as long as the integration runs at least once a month; otherwise link the account again. tado is a trademark of tado GmbH.",
+        "fr": "Connecteur non officiel, sans lien avec tado. Cliquez sur « Lier mon compte tado° » : une page de connexion tado s'ouvre, approuvez l'accès, et l'intégration découvre vos maisons et zones (thermostats et têtes V3+, V3, V2, eau chaude, climatisation, et pièces tado X). Le lien reste valable tant que l'intégration tourne au moins une fois par mois ; sinon, liez à nouveau le compte. tado est une marque de tado GmbH."
+      },
+      "links": [
+        { "url": "https://app.tado.com/", "label": { "en": "tado° web app", "fr": "Application web tado°" } },
+        { "url": "https://github.com/LM1LC3N7/gladys-tado/blob/main/docs/fr.md", "label": { "en": "Guide (French)", "fr": "Guide (français)" } },
+        { "url": "https://github.com/LM1LC3N7/gladys-tado/blob/main/docs/en.md", "label": { "en": "Guide (English)", "fr": "Guide (anglais)" } }
+      ]
+    },
+    {
+      "key": "account",
+      "type": "account_link",
+      "label": { "en": "Link my tado° account", "fr": "Lier mon compte tado°" },
+      "description": {
+        "en": "Opens the tado sign-in page in a new tab. Come back here once approved: the status below turns green within a few seconds.",
+        "fr": "Ouvre la page de connexion tado dans un nouvel onglet. Revenez ici une fois l'accès approuvé : l'état ci-dessous passe au vert en quelques secondes."
+      }
+    },
+    {
+      "key": "options",
+      "type": "section",
+      "label": { "en": "Options", "fr": "Options" },
+      "description": {
+        "en": "How a manual setpoint sent from Gladys ends, and how often tado is read. tado answers every home from the cloud: reading faster than every minute brings nothing.",
+        "fr": "Comment se termine une consigne manuelle envoyée depuis Gladys, et à quelle fréquence tado est lu. tado répond depuis le cloud : lire plus vite qu'une fois par minute n'apporte rien."
+      }
+    },
+    {
+      "key": "termination",
+      "type": "select",
+      "label": { "en": "A manual setpoint lasts", "fr": "Une consigne manuelle dure" },
+      "default": "next_time_block",
+      "required": false,
+      "options": [
+        { "value": "next_time_block", "label": { "en": "Until the next schedule block", "fr": "Jusqu'au prochain bloc de programmation" } },
+        { "value": "timer", "label": { "en": "A fixed duration (below)", "fr": "Une durée fixe (ci-dessous)" } },
+        { "value": "manual", "label": { "en": "Until changed again", "fr": "Jusqu'à la prochaine modification" } }
+      ]
+    },
+    {
+      "key": "timer_minutes",
+      "type": "number",
+      "label": { "en": "Fixed duration (minutes)", "fr": "Durée fixe (minutes)" },
+      "default": 60,
+      "min": 5,
+      "max": 1440,
+      "required": false
+    },
+    {
+      "key": "refresh_interval",
+      "type": "number",
+      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "default": 120,
+      "min": 60,
+      "max": 3600,
+      "required": false
+    },
+    {
+      "key": "track_phones",
+      "type": "boolean",
+      "label": { "en": "One presence sensor per phone with geofencing", "fr": "Un capteur de présence par téléphone géolocalisé" },
+      "description": {
+        "en": "Creates a device per phone whose tado geofencing is on, with an \"at home\" sensor. Off by default: it is personal location data.",
+        "fr": "Crée un appareil par téléphone dont la géolocalisation tado est active, avec un capteur « à la maison ». Désactivé par défaut : ce sont des données de localisation personnelles."
+      },
+      "default": false,
+      "required": false
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": { "en": "Test the connection", "fr": "Tester la connexion" },
+      "description": { "en": "Reads your tado account and lists its homes.", "fr": "Lit votre compte tado et liste ses maisons." }
+    },
+    {
+      "key": "unlink",
+      "timeout_seconds": 15,
+      "label": { "en": "Unlink the account", "fr": "Délier le compte" },
+      "description": { "en": "Forgets the tado session. The devices stay in Gladys until you delete them.", "fr": "Oublie la session tado. Les appareils restent dans Gladys tant que vous ne les supprimez pas." }
+    }
+  ],
+  "widgets": [
+    {
+      "key": "home",
+      "label": { "en": "tado° home", "fr": "Maison tado°" },
+      "description": { "en": "Presence, outside weather, every zone at a glance, Home / Away buttons.", "fr": "Présence, météo extérieure, toutes les zones d'un coup d'œil, boutons Maison / Absent." },
+      "icon": "home",
+      "action_timeout_seconds": 30,
+      "settings": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Home (the tado° home device)", "fr": "Maison (l'appareil maison tado°)" } }
+      ]
+    },
+    {
+      "key": "zone",
+      "label": { "en": "tado° zone", "fr": "Zone tado°" },
+      "description": { "en": "One zone: temperature, humidity, setpoint, heating power, mode, +/− buttons, schedule and off.", "fr": "Une zone : température, humidité, consigne, puissance de chauffe, mode, boutons +/−, programmation et arrêt." },
+      "icon": "thermometer",
+      "action_timeout_seconds": 30,
+      "settings": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Zone", "fr": "Zone" } }
+      ]
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "presence_changed",
+      "label": { "en": "tado° presence changed", "fr": "Présence tado° modifiée" },
+      "description": { "en": "The home switched between Home and Away (geofencing or a manual change).", "fr": "La maison est passée de Maison à Absent ou l'inverse (géolocalisation ou changement manuel)." },
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Home", "fr": "Maison" } },
+        {
+          "key": "presence",
+          "type": "select",
+          "required": false,
+          "label": { "en": "New presence (empty: any)", "fr": "Nouvelle présence (vide : toutes)" },
+          "options": [
+            { "value": "home", "label": { "en": "Home", "fr": "Maison" } },
+            { "value": "away", "label": { "en": "Away", "fr": "Absent" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "presence", "type": "string", "label": { "en": "New presence", "fr": "Nouvelle présence" } },
+        { "key": "previous", "type": "string", "label": { "en": "Previous presence", "fr": "Présence précédente" } }
+      ]
+    },
+    {
+      "key": "open_window_detected",
+      "label": { "en": "tado° open window detected", "fr": "Fenêtre ouverte détectée par tado°" },
+      "description": { "en": "A zone detected an open window (the heating pauses).", "fr": "Une zone a détecté une fenêtre ouverte (le chauffage se met en pause)." },
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": false, "label": { "en": "Zone (empty: any)", "fr": "Zone (vide : toutes)" } }
+      ],
+      "variables": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } },
+        { "key": "temperature", "type": "number", "label": { "en": "Temperature", "fr": "Température" } }
+      ]
+    },
+    {
+      "key": "heating_changed",
+      "label": { "en": "tado° zone started / stopped heating", "fr": "Zone tado° : chauffe démarrée / arrêtée" },
+      "description": { "en": "The heating power of a zone went from zero to positive, or back to zero.", "fr": "La puissance de chauffe d'une zone est passée de zéro à positive, ou est revenue à zéro." },
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": false, "label": { "en": "Zone (empty: any)", "fr": "Zone (vide : toutes)" } },
+        {
+          "key": "heating",
+          "type": "select",
+          "required": false,
+          "label": { "en": "Change (empty: both)", "fr": "Changement (vide : les deux)" },
+          "options": [
+            { "value": "on", "label": { "en": "Started heating", "fr": "Chauffe démarrée" } },
+            { "value": "off", "label": { "en": "Stopped heating", "fr": "Chauffe arrêtée" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } },
+        { "key": "target_temperature", "type": "number", "label": { "en": "Target temperature", "fr": "Consigne" } },
+        { "key": "temperature", "type": "number", "label": { "en": "Temperature", "fr": "Température" } }
+      ]
+    },
+    {
+      "key": "low_battery",
+      "label": { "en": "tado° low battery", "fr": "Batterie tado° faible" },
+      "description": { "en": "A thermostat or valve of a zone reports a low battery.", "fr": "Un thermostat ou une tête d'une zone signale une batterie faible." },
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": false, "label": { "en": "Zone (empty: any)", "fr": "Zone (vide : toutes)" } }
+      ],
+      "variables": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "set_temperature",
+      "label": { "en": "tado° set a temperature", "fr": "tado° régler une température" },
+      "description": { "en": "A manual setpoint on a zone, until the next schedule block, for a duration, or until changed.", "fr": "Une consigne manuelle sur une zone, jusqu'au prochain bloc, pour une durée, ou jusqu'à modification." },
+      "timeout_seconds": 30,
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Zone", "fr": "Zone" } },
+        { "key": "temperature", "type": "number", "required": true, "min": 5, "max": 65, "label": { "en": "Temperature (°C)", "fr": "Température (°C)" } },
+        {
+          "key": "termination",
+          "type": "select",
+          "required": false,
+          "label": { "en": "Lasts (empty: the configured default)", "fr": "Dure (vide : le réglage par défaut)" },
+          "options": [
+            { "value": "next_time_block", "label": { "en": "Until the next schedule block", "fr": "Jusqu'au prochain bloc" } },
+            { "value": "timer", "label": { "en": "The duration below", "fr": "La durée ci-dessous" } },
+            { "value": "manual", "label": { "en": "Until changed again", "fr": "Jusqu'à modification" } }
+          ]
+        },
+        { "key": "minutes", "type": "number", "required": false, "min": 5, "max": 1440, "label": { "en": "Duration (minutes)", "fr": "Durée (minutes)" } }
+      ],
+      "outputs": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } },
+        { "key": "target_temperature", "type": "number", "label": { "en": "Target temperature", "fr": "Consigne" } },
+        { "key": "temperature", "type": "number", "label": { "en": "Temperature", "fr": "Température" } }
+      ]
+    },
+    {
+      "key": "resume_schedule",
+      "label": { "en": "tado° back to the schedule", "fr": "tado° retour à la programmation" },
+      "description": { "en": "Ends the manual setpoint of a zone.", "fr": "Termine la consigne manuelle d'une zone." },
+      "timeout_seconds": 30,
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Zone", "fr": "Zone" } }
+      ],
+      "outputs": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } },
+        { "key": "target_temperature", "type": "number", "label": { "en": "Target temperature", "fr": "Consigne" } }
+      ]
+    },
+    {
+      "key": "set_presence",
+      "label": { "en": "tado° set the presence", "fr": "tado° régler la présence" },
+      "description": { "en": "Forces Home or Away on the whole home, or goes back to the automatic geofencing.", "fr": "Force Maison ou Absent sur toute la maison, ou revient à la géolocalisation automatique." },
+      "timeout_seconds": 30,
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Home", "fr": "Maison" } },
+        {
+          "key": "presence",
+          "type": "select",
+          "required": true,
+          "default": "home",
+          "label": { "en": "Presence", "fr": "Présence" },
+          "options": [
+            { "value": "home", "label": { "en": "Home", "fr": "Maison" } },
+            { "value": "away", "label": { "en": "Away", "fr": "Absent" } },
+            { "value": "auto", "label": { "en": "Automatic (geofencing)", "fr": "Automatique (géolocalisation)" } }
+          ]
+        }
+      ],
+      "outputs": [
+        { "key": "presence", "type": "string", "label": { "en": "Presence after the change", "fr": "Présence après le changement" } },
+        { "key": "mode", "type": "string", "label": { "en": "Mode (auto, home, away)", "fr": "Mode (auto, home, away)" } }
+      ]
+    },
+    {
+      "key": "get_zone",
+      "label": { "en": "tado° read a zone", "fr": "tado° lire une zone" },
+      "description": { "en": "The current values of a zone, for a condition or a message that follows.", "fr": "Les valeurs actuelles d'une zone, pour une condition ou un message qui suit." },
+      "timeout_seconds": 10,
+      "fields": [
+        { "key": "device", "type": "select", "source": "devices", "required": true, "label": { "en": "Zone", "fr": "Zone" } }
+      ],
+      "outputs": [
+        { "key": "zone", "type": "string", "label": { "en": "Zone name", "fr": "Nom de la zone" } },
+        { "key": "temperature", "type": "number", "label": { "en": "Temperature", "fr": "Température" } },
+        { "key": "humidity", "type": "number", "label": { "en": "Humidity", "fr": "Humidité" } },
+        { "key": "target_temperature", "type": "number", "label": { "en": "Target temperature", "fr": "Consigne" } },
+        { "key": "heating", "type": "boolean", "label": { "en": "Heating now", "fr": "En chauffe" } },
+        { "key": "heating_power", "type": "number", "label": { "en": "Heating power (%)", "fr": "Puissance de chauffe (%)" } },
+        { "key": "mode", "type": "string", "label": { "en": "Mode (off, manual, schedule)", "fr": "Mode (off, manual, schedule)" } },
+        { "key": "manual", "type": "boolean", "label": { "en": "Manual setpoint active", "fr": "Consigne manuelle active" } },
+        { "key": "open_window", "type": "boolean", "label": { "en": "Open window detected", "fr": "Fenêtre ouverte détectée" } },
+        { "key": "low_battery", "type": "boolean", "label": { "en": "Low battery", "fr": "Batterie faible" } }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,403 @@
+{
+  "manifest_version": 1,
+  "type": "provider",
+  "name": "IFTTT",
+  "description": {
+    "en": "Unofficial connector: trigger IFTTT applets from scenes, start scenes from IFTTT (Plus).",
+    "fr": "Connecteur non officiel : déclenchez des applets IFTTT depuis les scènes, et l'inverse (Plus)."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-ifttt:0.1.0",
+  "gladys_version": ">=5.1.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-ifttt/main/cover.png",
+  "categories": ["services", "notifications"],
+  "transports": ["cloud"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": {
+        "en": "IFTTT Webhooks",
+        "fr": "Webhooks IFTTT"
+      },
+      "description": {
+        "en": "Unofficial connector, not affiliated with IFTTT. Your scenes can trigger any IFTTT applet whose \"If This\" is the Webhooks service (event name + up to three values, or a JSON payload), and, with Gladys Plus, an IFTTT applet can start a Gladys scene through the inbound webhook below. Create an applet with the Webhooks trigger \"Receive a web request\" and copy your key from the Webhooks settings page.",
+        "fr": "Connecteur non officiel, sans lien avec IFTTT. Vos scènes peuvent déclencher n'importe quel applet IFTTT dont le « If This » est le service Webhooks (nom d'événement + jusqu'à trois valeurs, ou une charge JSON), et, avec Gladys Plus, un applet IFTTT peut lancer une scène Gladys via le webhook entrant ci-dessous. Créez un applet avec le déclencheur Webhooks « Receive a web request » et copiez votre clé depuis la page des réglages Webhooks."
+      },
+      "links": [
+        {
+          "url": "https://ifttt.com/maker_webhooks/settings",
+          "label": {
+            "en": "IFTTT Webhooks settings (your key)",
+            "fr": "Réglages Webhooks IFTTT (votre clé)"
+          }
+        },
+        {
+          "url": "https://ifttt.com/maker_webhooks",
+          "label": {
+            "en": "The Webhooks service",
+            "fr": "Le service Webhooks"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-ifttt/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-ifttt/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "webhooks_key",
+      "type": "secret",
+      "label": {
+        "en": "IFTTT Webhooks key",
+        "fr": "Clé Webhooks IFTTT"
+      },
+      "description": {
+        "en": "The key shown after \"Your key is:\" on the Webhooks settings page (or the end of the URL after /use/). Stored encrypted by Gladys.",
+        "fr": "La clé affichée après « Your key is: » sur la page des réglages Webhooks (ou la fin de l'URL après /use/). Stockée chiffrée par Gladys."
+      },
+      "required": true
+    },
+    {
+      "key": "inbound",
+      "type": "section",
+      "label": {
+        "en": "From IFTTT to Gladys (Gladys Plus)",
+        "fr": "D'IFTTT vers Gladys (Gladys Plus)"
+      },
+      "description": {
+        "en": "To start a Gladys scene from IFTTT, link Gladys Plus and paste your Open API key in the \"Gladys Plus webhooks\" block: Gladys then shows the public URL to use in an IFTTT applet with the action \"Webhooks: Make a web request\" (POST, Content Type application/json, body {\"event\": \"my_event\", \"value1\": \"...\"}). Your scenes then use the trigger \"IFTTT event received\". The URL is a secret: add the optional shared secret below to refuse requests that do not carry it.",
+        "fr": "Pour lancer une scène Gladys depuis IFTTT, liez Gladys Plus et collez votre clé Open API dans le bloc « Webhooks Gladys Plus » : Gladys affiche alors l'URL publique à utiliser dans un applet IFTTT avec l'action « Webhooks: Make a web request » (POST, Content Type application/json, corps {\"event\": \"mon_evenement\", \"value1\": \"...\"}). Vos scènes utilisent ensuite le déclencheur « Événement IFTTT reçu ». L'URL est un secret : ajoutez le secret partagé facultatif ci-dessous pour refuser les requêtes qui ne le portent pas."
+      }
+    },
+    {
+      "key": "inbound_secret",
+      "type": "secret",
+      "label": {
+        "en": "Shared secret for inbound requests (optional)",
+        "fr": "Secret partagé des requêtes entrantes (facultatif)"
+      },
+      "description": {
+        "en": "When set, an inbound request is accepted only if its JSON body, form body or query string carries \"secret\" with this value.",
+        "fr": "Si renseigné, une requête entrante n'est acceptée que si son corps JSON, son formulaire ou sa chaîne de requête porte « secret » avec cette valeur."
+      },
+      "required": false
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_connection",
+      "timeout_seconds": 20,
+      "label": {
+        "en": "Send a test event",
+        "fr": "Envoyer un événement de test"
+      },
+      "description": {
+        "en": "Triggers the event below with value1 = \"Gladys\" and value2 = \"test\", and shows the inbound URL when Gladys Plus is linked.",
+        "fr": "Déclenche l'événement ci-dessous avec value1 = « Gladys » et value2 = « test », et affiche l'URL entrante si Gladys Plus est lié."
+      },
+      "fields": [
+        {
+          "key": "event",
+          "type": "string",
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          },
+          "default": "gladys_test",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "webhooks": [
+    {
+      "key": "inbound",
+      "label": {
+        "en": "IFTTT inbound events",
+        "fr": "Événements IFTTT entrants"
+      },
+      "mode": "fire_and_forget"
+    }
+  ],
+  "widgets": [
+    {
+      "key": "button",
+      "label": {
+        "en": "IFTTT button",
+        "fr": "Bouton IFTTT"
+      },
+      "description": {
+        "en": "One button that triggers an IFTTT event from the dashboard.",
+        "fr": "Un bouton qui déclenche un événement IFTTT depuis le tableau de bord."
+      },
+      "icon": "zap",
+      "action_timeout_seconds": 20,
+      "settings": [
+        {
+          "key": "event",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "IFTTT event name",
+            "fr": "Nom de l'événement IFTTT"
+          },
+          "placeholder": {
+            "en": "turn_on_coffee",
+            "fr": "allumer_cafe"
+          }
+        },
+        {
+          "key": "label",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Title",
+            "fr": "Titre"
+          }
+        },
+        {
+          "key": "description",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Caption",
+            "fr": "Légende"
+          }
+        },
+        {
+          "key": "button_label",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Button text",
+            "fr": "Texte du bouton"
+          }
+        },
+        {
+          "key": "value1",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value1 sent with the event",
+            "fr": "value1 envoyée avec l'événement"
+          }
+        },
+        {
+          "key": "confirm",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "label": {
+            "en": "Ask for confirmation",
+            "fr": "Demander une confirmation"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "event_received",
+      "label": {
+        "en": "IFTTT event received",
+        "fr": "Événement IFTTT reçu"
+      },
+      "description": {
+        "en": "An IFTTT applet (or any HTTP client) called the inbound webhook relayed by Gladys Plus with an event name.",
+        "fr": "Un applet IFTTT (ou tout client HTTP) a appelé le webhook entrant relayé par Gladys Plus avec un nom d'événement."
+      },
+      "fields": [
+        {
+          "key": "event",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Event name (empty: any)",
+            "fr": "Nom de l'événement (vide : tous)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "event",
+          "type": "string",
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "value1",
+          "type": "string",
+          "label": {
+            "en": "value1",
+            "fr": "value1"
+          }
+        },
+        {
+          "key": "value2",
+          "type": "string",
+          "label": {
+            "en": "value2",
+            "fr": "value2"
+          }
+        },
+        {
+          "key": "value3",
+          "type": "string",
+          "label": {
+            "en": "value3",
+            "fr": "value3"
+          }
+        },
+        {
+          "key": "payload",
+          "type": "string",
+          "label": {
+            "en": "Other fields (JSON)",
+            "fr": "Autres champs (JSON)"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "trigger_event",
+      "label": {
+        "en": "Trigger an IFTTT event",
+        "fr": "Déclencher un événement IFTTT"
+      },
+      "description": {
+        "en": "Calls the IFTTT Webhooks service: every applet listening to this event name runs, with value1, value2 and value3 as ingredients.",
+        "fr": "Appelle le service Webhooks d'IFTTT : chaque applet à l'écoute de ce nom d'événement s'exécute, avec value1, value2 et value3 comme ingrédients."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "event",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          },
+          "placeholder": {
+            "en": "turn_on_coffee",
+            "fr": "allumer_cafe"
+          }
+        },
+        {
+          "key": "value1",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value1",
+            "fr": "value1"
+          }
+        },
+        {
+          "key": "value2",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value2",
+            "fr": "value2"
+          }
+        },
+        {
+          "key": "value3",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value3",
+            "fr": "value3"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "event",
+          "type": "string",
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "answer",
+          "type": "string",
+          "label": {
+            "en": "IFTTT answer",
+            "fr": "Réponse d'IFTTT"
+          }
+        }
+      ]
+    },
+    {
+      "key": "trigger_event_json",
+      "label": {
+        "en": "Trigger an IFTTT event (JSON)",
+        "fr": "Déclencher un événement IFTTT (JSON)"
+      },
+      "description": {
+        "en": "Same as above with an arbitrary JSON object, exposed to the applet as its \"JSON payload\" ingredient. Scene variables ({{...}}) are resolved first.",
+        "fr": "Comme ci-dessus avec un objet JSON libre, exposé à l'applet comme ingrédient « JSON payload ». Les variables de scène ({{...}}) sont résolues d'abord."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "event",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "payload",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "JSON object",
+            "fr": "Objet JSON"
+          },
+          "placeholder": {
+            "en": "{\"temperature\": \"{{device.living_room.temperature}}\"}",
+            "fr": "{\"temperature\": \"{{device.salon.temperature}}\"}"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "event",
+          "type": "string",
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "answer",
+          "type": "string",
+          "label": {
+            "en": "IFTTT answer",
+            "fr": "Réponse d'IFTTT"
+          }
+        }
+      ]
+    }
+  ]
+}

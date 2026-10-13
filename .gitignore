@@ -8,3 +8,6 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+
+# Staging area for future standalone repositories
+new-integrations/*/node_modules/
