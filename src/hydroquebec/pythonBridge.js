@@ -22,6 +22,15 @@ export class PythonBridge {
     this.process = null;
     this.pending = new Map(); // request id -> { resolve, reject }
     this.nextId = 1;
+    // Bumped on every spawn. The Python side keeps its logged-in session and
+    // discovered contracts in memory only, so a respawned process knows
+    // nothing: callers compare generations to know when to re-discover.
+    this.generation = 0;
+  }
+
+  /** Is the process down, or a different one than the `generation` the caller last saw? */
+  hasRestartedSince(generation) {
+    return !this.process || this.generation !== generation;
   }
 
   start() {
@@ -29,6 +38,15 @@ export class PythonBridge {
     this.logger.info(`Starting Hydro-Québec bridge: ${this.pythonExecutable} ${this.scriptPath}`);
     const child = spawn(this.pythonExecutable, [this.scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
     this.process = child;
+    this.generation += 1;
+
+    // A write to a process that just died fails with EPIPE: that error is
+    // already reported to the caller through the write callback in call(),
+    // but the stream ALSO emits it as an 'error' event, which would crash the
+    // whole integration if nothing listened for it.
+    child.stdin.on('error', (err) => {
+      this.logger.warn(`Hydro-Québec bridge stdin error: ${err.message}`);
+    });
 
     createInterface({ input: child.stdout }).on('line', (line) => this._handleLine(line));
 

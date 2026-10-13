@@ -28,6 +28,11 @@ updates:
     schedule:
       interval: 'weekly'
     labels: ['dependencies']
+    # Lint/format tooling only (never shipped in the image): one PR per week
+    # for all of it instead of one per package.
+    groups:
+      dev-tooling:
+        dependency-type: 'development'
 
   - package-ecosystem: 'docker'
     directory: '/'
@@ -35,6 +40,14 @@ updates:
     schedule:
       interval: 'weekly'
     labels: ['dependencies']
+    # Odd-numbered Node.js majors are short-lived "Current" releases that never
+    # become LTS (node:25 was proposed here and reached end of life on
+    # 2026-06-01). The base image moves from one LTS major to the next by hand
+    # (keep ci.yml's node-version and package.json's engines in step); minor and
+    # patch updates of the current LTS still come through Dependabot.
+    ignore:
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: 'github-actions'
     directory: '/'

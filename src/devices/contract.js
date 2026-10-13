@@ -18,6 +18,9 @@ import { isCpcContract, isDpcContract } from '../hydroquebec/discovery.js';
 
 const logger = createLogger({ name: 'contract' });
 
+// publishStates() accepts at most 100 states per request.
+const MAX_STATES_PER_REQUEST = 100;
+
 const FEATURE = {
   DAILY_CONSUMPTION: 'daily_consumption',
   DAILY_CONSUMPTION_COST: 'daily_consumption_cost',
@@ -274,54 +277,99 @@ export function buildContractDevice(gladys, contract) {
   };
 }
 
-/**
- * Fetch fresh data for one contract and publish every feature state to Gladys.
- *
- * `session.fetchContractSnapshot()` returns the flat JSON produced by the
- * `poll` command of bridge/hq_bridge.py - already-derived values straight
- * from hydroqc's own Contract/PeakHandler properties (cumulated credit,
- * current_state, critical hours called...), not raw API payloads: there is
- * no Hydro-Québec-specific parsing left to do here.
- */
-export async function pollContractDevice(gladys, session, contract, config) {
-  const ids = gladys.externalIds('contract', contract.contractId);
-  const snapshot = await session.fetchContractSnapshot(contract, config?.preheat_duration_minutes);
+function statesBuilder(ids) {
   const states = [];
-
-  const pushNumber = (key, value) => {
-    if (value === null || value === undefined || Number.isNaN(value)) return;
-    states.push({ device_feature_external_id: ids.feature(key), state: Number(value) });
+  const pushNumber = (key, value, createdAt) => {
+    if (value === null || value === undefined) return;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return;
+    const state = { device_feature_external_id: ids.feature(key), state: number };
+    if (createdAt) state.created_at = createdAt;
+    states.push(state);
   };
   const pushText = (key, value) => {
     if (value === null || value === undefined) return;
     states.push({ device_feature_external_id: ids.feature(key), text: String(value) });
   };
+  const pushBinary = (key, value) => {
+    if (value === null || value === undefined) return;
+    pushNumber(key, value ? 1 : 0);
+  };
+  return { states, pushNumber, pushText, pushBinary };
+}
 
-  pushNumber(FEATURE.DAILY_CONSUMPTION, snapshot.daily_consumption_kwh);
-  pushNumber(FEATURE.AVG_TEMPERATURE, snapshot.avg_temperature);
+/**
+ * The time-dependent peak features of a contract, from the `cpc`/`dpc` part
+ * of a `poll` or `peaks` bridge answer. Only the fields present are pushed: a
+ * `peaks` answer carries the peak state alone, not the credit/savings figures.
+ */
+export function peakFeatureStates(ids, { cpc, dpc } = {}) {
+  const { states, pushNumber, pushText, pushBinary } = statesBuilder(ids);
+  if (cpc) {
+    pushNumber(FEATURE.CPC_CUMULATED_CREDIT, cpc.cumulated_credit);
+    pushNumber(FEATURE.CPC_PROJECTED_CREDIT, cpc.projected_cumulated_credit);
+    pushText(FEATURE.CPC_STATE, cpc.current_state);
+    pushBinary(FEATURE.CPC_CRITICAL_PEAK_COMING, cpc.critical_peak_coming);
+    pushBinary(FEATURE.CPC_PREHEAT_IN_PROGRESS, cpc.preheat_in_progress);
+  }
+  if (dpc) {
+    pushText(FEATURE.DPC_STATE, dpc.current_state);
+    pushBinary(FEATURE.DPC_PEAK_IN_PROGRESS, dpc.peak_in_progress);
+    pushBinary(FEATURE.DPC_PREHEAT_IN_PROGRESS, dpc.preheat_in_progress);
+    pushNumber(FEATURE.DPC_HOURS_CRITICAL_CALLED, dpc.critical_called_hours);
+    pushNumber(FEATURE.DPC_SAVINGS_VS_BASE, dpc.amount_saved_vs_base_rate);
+  }
+  return states;
+}
+
+/**
+ * Every feature state of one `poll` snapshot (the flat JSON of the `poll`
+ * command of bridge/hq_bridge.py: already-derived hydroqc values, no
+ * Hydro-Québec-specific parsing left to do here).
+ *
+ * The daily consumption and average temperature describe a PAST day
+ * (Hydro-Québec publishes 1 to 2 days late): they carry that day as
+ * `created_at` (`daily_consumption_at`, local midnight), so Gladys files them
+ * under the day they measure instead of the day they were read.
+ */
+export function contractStates(ids, snapshot) {
+  const { states, pushNumber, pushBinary } = statesBuilder(ids);
+  const dayAt = snapshot.daily_consumption_at ?? undefined;
+  pushNumber(FEATURE.DAILY_CONSUMPTION, snapshot.daily_consumption_kwh, dayAt);
+  pushNumber(FEATURE.AVG_TEMPERATURE, snapshot.avg_temperature, dayAt);
   pushNumber(FEATURE.DAILY_CONSUMPTION_COST, snapshot.daily_cost_mean);
   pushNumber(FEATURE.BALANCE, snapshot.balance);
-  pushNumber(FEATURE.POWER_OUTAGE, snapshot.outage_active ? 1 : 0);
+  pushBinary(FEATURE.POWER_OUTAGE, snapshot.outage_active);
+  return [...states, ...peakFeatureStates(ids, snapshot)];
+}
 
-  if (snapshot.cpc) {
-    pushNumber(FEATURE.CPC_CUMULATED_CREDIT, snapshot.cpc.cumulated_credit);
-    pushNumber(FEATURE.CPC_PROJECTED_CREDIT, snapshot.cpc.projected_cumulated_credit);
-    pushText(FEATURE.CPC_STATE, snapshot.cpc.current_state);
-    pushNumber(FEATURE.CPC_CRITICAL_PEAK_COMING, snapshot.cpc.critical_peak_coming ? 1 : 0);
-    pushNumber(FEATURE.CPC_PREHEAT_IN_PROGRESS, snapshot.cpc.preheat_in_progress ? 1 : 0);
+/**
+ * Publish the given states for a contract, keeping only those that changed
+ * (see statePublisher.js), in batches the host API accepts.
+ */
+export async function publishContractStates(gladys, publisher, states) {
+  const changed = publisher ? publisher.changed(states) : states;
+  for (let i = 0; i < changed.length; i += MAX_STATES_PER_REQUEST) {
+    const batch = changed.slice(i, i + MAX_STATES_PER_REQUEST);
+    await gladys.publishStates(batch);
+    // Only once accepted: a failed publish is retried at the next refresh.
+    publisher?.commit(batch);
   }
+  return changed.length;
+}
 
-  if (snapshot.dpc) {
-    pushText(FEATURE.DPC_STATE, snapshot.dpc.current_state);
-    pushNumber(FEATURE.DPC_PEAK_IN_PROGRESS, snapshot.dpc.peak_in_progress ? 1 : 0);
-    pushNumber(FEATURE.DPC_PREHEAT_IN_PROGRESS, snapshot.dpc.preheat_in_progress ? 1 : 0);
-    pushNumber(FEATURE.DPC_HOURS_CRITICAL_CALLED, snapshot.dpc.critical_called_hours);
-    pushNumber(FEATURE.DPC_SAVINGS_VS_BASE, snapshot.dpc.amount_saved_vs_base_rate);
-  }
-
+/**
+ * Fetch fresh data for one contract, publish what changed, and return the
+ * snapshot (its `cpc`/`dpc` peak schedule drives the peak timers in index.js).
+ */
+export async function pollContractDevice(gladys, session, contract, config, publisher) {
+  const ids = gladys.externalIds('contract', contract.contractId);
+  const snapshot = await session.fetchContractSnapshot(contract, config?.preheat_duration_minutes);
+  const states = contractStates(ids, snapshot);
   if (states.length === 0) {
     logger.warn(`No data could be fetched for contract ${contract.contractId}, skipping publish`);
-    return;
+    return snapshot;
   }
-  await gladys.publishStates(states);
+  await publishContractStates(gladys, publisher, states);
+  return snapshot;
 }

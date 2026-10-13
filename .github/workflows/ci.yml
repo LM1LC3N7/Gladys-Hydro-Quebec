@@ -1,8 +1,20 @@
 name: CI
 
 on:
+  # Branch pushes are covered by their pull request: running on every push too
+  # ran the whole CI twice per commit of a PR branch (Actions quota).
   push:
+    branches: [main]
   pull_request:
+
+# A newer commit on the same PR supersedes the run in progress; runs on main
+# always complete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
   node:
@@ -11,12 +23,17 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Same major as the Dockerfile's node:<major>-alpine base image: test
+          # the runtime that actually ships.
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+      # The Gladys store's own admission checks on the manifest (scene
+      # triggers, config schema, actions...), as run by the store indexer.
+      - run: npx --yes github:GladysAssistant/integration-store .
 
   bridge:
     runs-on: ubuntu-latest
@@ -26,9 +43,18 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: bridge/requirements.txt
-      - run: pip install -r bridge/requirements.txt
+          cache-dependency-path: |
+            bridge/requirements.txt
+            bridge/requirements-dev.txt
+      - run: pip install -r bridge/requirements-dev.txt
       - run: python -m py_compile bridge/hq_bridge.py
+      - run: ruff check bridge
+      # Unit tests of the bridge against real hydroqc objects (peak state,
+      # pre-heat, schedule, dated consumption, clock pinned to Eastern time).
+      # TZ=UTC on purpose: the container default the bridge must not depend on.
+      - run: python -m pytest -q bridge/tests
+        env:
+          TZ: UTC
       # Import-only smoke test: catches a hydroqc release that renames/removes
       # something this bridge relies on (WebUser, ContractDCPC/DPC, OutageStatus...)
       # without needing real Hydro-Québec credentials.
