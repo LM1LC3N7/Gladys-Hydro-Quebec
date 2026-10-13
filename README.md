@@ -1,9 +1,11 @@
 # Gladys Hydro-Québec
 
 External integration for [Gladys Assistant](https://gladysassistant.com) that
-connects an Hydro-Québec online account: daily consumption, average outdoor
-temperature, account balance, outages, and — for the dynamic rate options —
-Winter Credit (CPC) and Flex D (DPC) peak events. One Gladys device is
+connects an Hydro-Québec online account: consumption per half-hour (priced
+by Gladys's energy contracts: Rate D and Flex D templates, Flex D peak
+calendar), average outdoor temperature, account balance, outages, and — for
+the dynamic rate options — Winter Credit (CPC) and Flex D (DPC) peak events.
+Requires Gladys 5.2 or later. One Gladys device is
 created per Hydro-Québec **contract** on the account (an account can have
 several: a primary residence, a rental, a cottage...).
 
@@ -84,6 +86,8 @@ code has to change.
 │     ├─ pythonBridge.js          # Spawns bridge/hq_bridge.py, JSON-line request/response
 │     ├─ session.js               # snake_case (Python) -> camelCase (JS) translation
 │     ├─ discovery.js             # isCpcContract/isDpcContract: pure helpers, no I/O
+│     ├─ consumption.js           # Hourly readings -> dated 30-min consumption (publishEnergyConsumption)
+│     ├─ peakCalendar.js          # Flex D peak events -> `hq-critical-peaks` calendar slots
 │     ├─ peakMonitor.js           # Peak reading -> features, scene events, timers
 │     ├─ peakTracker.js           # Peak transitions -> scene events (announced, pre-heat...)
 │     └─ peakScheduler.js         # Exact-time transition timers + announcement checks
@@ -93,7 +97,7 @@ code has to change.
 │  ├─ requirements-dev.txt        # + pytest, ruff (CI/local only, not in the image)
 │  └─ tests/                      # pytest suite against real hydroqc objects
 ├─ docs/{en,fr}.md                # User-facing documentation (required by the Gladys store)
-├─ gladys-assistant-integration.json  # Manifest: config_schema, categories, docker image
+├─ gladys-assistant-integration.json  # Manifest: config, scene triggers, energy contracts
 └─ Dockerfile                     # node:24-alpine + a Python venv for hydroqc
 ```
 
@@ -151,6 +155,8 @@ One JSON object per line, both ways. Node → Python:
 {"id": 1, "cmd": "discover", "username": "...", "password": "..."}
 {"id": 2, "cmd": "poll", "contract_id": "0123456789"}
 {"id": 3, "cmd": "peaks", "contract_id": "0123456789", "refresh_open_data": true}
+{"id": 4, "cmd": "hourly", "contract_id": "0123456789", "dates": ["2026-01-11", "2026-01-12"]}
+{"id": 5, "cmd": "peak_events"}
 ```
 
 Python → Node:
@@ -178,6 +184,27 @@ schedule every reading returns, `src/hydroquebec/peakScheduler.js`), and
 every 15 minutes from 10:30 to 15:00 Eastern time, when Hydro-Québec
 announces the next day's peaks. The transitions are also published as Gladys
 scene events (`scene_triggers` in the manifest, `peakTracker.js`).
+
+`hourly` reads the hourly consumption of the given Eastern days (one portal
+request each) and returns them as the 30-minute intervals Gladys prices:
+each hour split in two equal halves, stamped in UTC, the daylight saving
+days included (23 or 25 hours), with a `complete` flag per day. Node
+publishes them with `publishEnergyConsumption` (`src/hydroquebec/consumption.js`):
+Hydro-Québec serves a day about a day late, too late for Gladys's live index
+pipeline, so every interval is dated and Gladys recomputes the costs from the
+earliest one that changed. The first run reads from the 1st of the month (the
+contract's monthly tiers), then each run reads the days not settled yet (a
+complete day is read again until it is 2 days old, an incomplete one is given
+up after 7), at most 10 per run.
+
+`peak_events` returns the Flex D events of the public open-data feed (no
+portal request, no contract needed). Node turns them into the 30-minute slots
+of the `hq-critical-peaks` calendar the Flex D contract template reads
+(`src/hydroquebec/peakCalendar.js`), at every refresh and every announcement
+check. The feed only lists recent events: a slot is never taken back once its
+event has started, only a future one that disappeared (a cancelled
+announcement) goes back to `normal`. If another integration already owns the
+calendar (`403`), the publication stops quietly.
 
 **Time zone.** `hydroqc` reads "now" as the system's local wall clock
 labelled as Eastern time (`hydroqc.utils.now()`). Left on UTC — the Docker
@@ -278,9 +305,12 @@ npx --yes github:GladysAssistant/integration-store .   # Gladys store manifest c
 `npm test` covers the Node side (`PythonBridge`'s request/response
 correlation and crash handling, `HydroQcSession` re-discovering after a
 bridge restart against fake bridge processes in `test-fixtures/`, the state
-publishing, and the peak timers and scene events). `bridge/tests` covers what
-`hq_bridge.py` adds on top of `hydroqc` (dated consumption, pre-heat before
-critical peaks only, peak schedule, the Eastern-time clock) with real
+publishing, the peak timers and scene events, the dated consumption and the
+peak calendar — those two also against the SDK's fake Gladys, which answers
+like Gladys 5.2). `bridge/tests` covers what `hq_bridge.py` adds on top of
+`hydroqc` (hourly readings to 30-minute intervals across the daylight saving
+changes, Flex D events, pre-heat before critical peaks only, peak schedule,
+the Eastern-time clock) with real
 `hydroqc` peak handlers fed an open-data payload and a pinned clock. Neither
 re-tests `hydroqc`'s own login flow or peak math; that's upstream's job.
 
@@ -390,24 +420,32 @@ only the technical conditions that were exercised.
   The exact-time transitions, the scene triggers (Gladys 5.1+), the
   Eastern-time clock fix and the "pre-heat before critical peaks only" rule
   are unit-tested against real `hydroqc` objects, not yet on a real account.
-- The **date** Hydro-Québec gives a daily consumption figure
-  (`dateJourConso`, used to file it under the day it measures) is parsed as
+- The **hourly consumption** has not been read on a real account yet: the
+  row format (`heure` as `HH:MM:SS`, `consoTotal`) comes from `hydroqc`'s
+  types and `hydroqc-ha`'s import. How Hydro-Québec lists the repeated hour
+  of the autumn daylight saving change is unknown: listed twice, the day is
+  complete; listed once, the day stays incomplete and is given up after 7
+  days (one hour short).
+- The **date** Hydro-Québec gives a daily figure (`dateJourConso`, used to
+  file the average temperature under the day it measures) is parsed as
   `YYYY-MM-DD…`; if a real payload ever differs, the figure is published
-  without a date (once per value change) and a regression shows up as
-  missing history, not as wrong data.
-- Hourly consumption and the CSV export endpoints (`hydroqc` supports both)
-  are not wired up at all yet — only daily/period consumption is.
+  without a date.
 
 ## Known limitations / follow-ups
 
-- Upgrading from 0.1.x: the daily consumption used to be stored with the time
-  of each poll. The first one or two days after the upgrade may be skipped,
-  until a day newer than the last value stored by the previous version comes
-  in.
-
-- The "average daily cost" feature is the current billing period's average
-  $/day (`contract.cp_daily_bill_mean`): Hydro-Québec's API does not expose
-  an exact $ figure per individual day for the base "D" rate.
+- Upgrading: the daily consumption feature is gone (replaced by the 30-minute
+  one, its history is deleted when the user clicks "Update"), and the
+  "average daily cost" keeps its external id (and history) but becomes a
+  currency amount, "Average cost per day (current period)"
+  (`contract.cp_daily_bill_mean`), so it is never mistaken for the energy cost
+  Gladys derives from the consumption.
+- The contract templates carry the rates of April 1, 2026: every April, bump
+  their `version` with the new rates. Gladys never changes a user's contract
+  silently, it offers the update in its contract wizard.
+- Gladys counts the per-day allowance (40 kWh × days) per month, while
+  Hydro-Québec bills about every two months: the cost differs only when a
+  heavy month and a light one share a bill. The Winter Credit is a credit on
+  the bill, not a price: it is not part of the cost Gladys computes.
 - The cross-contract session fix in `hq_bridge.py` (0.1.5) reaches into a
   private (`_`-prefixed) `hydroqc` attribute because there is no public API
   for "reselect this contract" — flagged in that code's own comment as

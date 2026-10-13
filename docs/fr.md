@@ -1,9 +1,12 @@
 # Hydro-Québec
 
-Suivez votre compte Hydro-Québec directement dans Gladys : consommation
-quotidienne, température extérieure moyenne, solde du compte, pannes et, si
-vous êtes inscrit aux options tarifaires dynamiques, les pointes du Crédit
-Hivernal (CPC) et de Flex D (DPC).
+Suivez votre compte Hydro-Québec directement dans Gladys : consommation par
+demi-heure, coût calculé par Gladys selon votre tarif (Tarif D, Flex D),
+température extérieure moyenne, solde du compte, pannes et, si vous êtes
+inscrit aux options tarifaires dynamiques, les pointes du Crédit hivernal
+(CPC) et de Flex D (DPC).
+
+Nécessite **Gladys 5.2** ou plus récent.
 
 ## Ce que vous obtenez
 
@@ -11,17 +14,19 @@ Un appareil Gladys est créé **par contrat Hydro-Québec** sur votre compte
 (un seul identifiant peut couvrir plusieurs contrats : résidence principale,
 logement locatif, chalet...). Chaque appareil expose :
 
-- **Consommation quotidienne** (kWh) et **coût quotidien moyen** de la
-  période de facturation en cours ($). Hydro-Québec publie la consommation
-  d'une journée avec 1 à 2 jours de retard : chaque valeur est enregistrée
-  une seule fois, à la date de la journée mesurée, pour apparaître au bon
-  jour dans les graphiques.
+- **Consommation (30 min)** (kWh) : la consommation horaire d'Hydro-Québec,
+  chaque heure répartie en deux demi-heures égales. Hydro-Québec publie une
+  journée avec environ un jour de retard : chaque demi-heure est enregistrée
+  à sa date réelle. Gladys y ajoute de lui-même une fonctionnalité **coût**,
+  calculée par le contrat d'énergie que vous lui associez (voir plus bas).
+- **Coût moyen par jour (période en cours)** ($) : la moyenne par jour de la
+  période de facturation en cours, selon Hydro-Québec.
 - **Température extérieure moyenne** de la dernière journée publiée par
-  Hydro-Québec (enregistrée elle aussi à la date de cette journée).
+  Hydro-Québec (enregistrée à la date de cette journée).
 - **Solde du compte** ($).
 - **Panne en cours** (oui/non), pour l'adresse de consommation du contrat.
 
-Si le contrat est inscrit au **Crédit Hivernal (tarif D, option CPC)**, vous
+Si le contrat est inscrit au **Crédit hivernal (tarif D, option CPC)**, vous
 obtenez aussi : le crédit cumulé et projeté ($), l'état courant (normal /
 ancre / ancre critique / pointe / pointe critique), si une pointe critique
 approche, et si le préchauffage avant une pointe **critique** est en cours
@@ -38,10 +43,37 @@ suivant. Pendant les heures où Hydro-Québec annonce les pointes du
 lendemain (de 10 h 30 à 15 h, heure de l'Est), l'intégration vérifie les
 nouvelles annonces toutes les 15 minutes.
 
+## Coût de votre électricité
+
+L'intégration fournit à Gladys deux modèles de contrat, **Hydro-Québec –
+Tarif D** et **Hydro-Québec – Flex D** (grille du 1er avril 2026), ainsi
+que le calendrier des pointes Flex D. Pour obtenir le coût de votre
+consommation :
+
+1. Ajoutez l'appareil de votre contrat depuis l'onglet **Découverte** (ou
+   cliquez sur **Mettre à jour** s'il existait déjà).
+2. Dans Gladys, ouvrez **Intégrations → Suivi de l'énergie → Contrats** et
+   créez un contrat : choisissez comme compteur l'appareil de votre contrat
+   Hydro-Québec, puis le modèle **Tarif D** ou **Flex D**. Au Crédit
+   hivernal, choisissez **Tarif D** : le crédit lui-même reste suivi par les
+   fonctionnalités « Crédit hivernal » de l'appareil.
+3. C'est tout : Gladys calcule le coût de chaque demi-heure, l'affiche dans
+   ses graphiques d'énergie et dans le widget **Prix de l'électricité**, et
+   le déclencheur de scène **Changement de prix de l'électricité** suit les
+   changements de palier et les pointes.
+
+Pour Flex D, les demi-heures des pointes critiques sont lues sur les données
+ouvertes d'Hydro-Québec et publiées dans le calendrier `hq-critical-peaks` :
+leur énergie est facturée au prix de pointe et ne compte pas dans le palier
+de 40 kWh par jour. Une pointe annulée avant son début redevient normale.
+
+À la première connexion, l'intégration récupère la consommation depuis le
+1er du mois en cours, afin que les paliers du mois soient comptés en entier
+(10 jours par rafraîchissement : le rattrapage peut prendre quelques heures).
+
 ## Déclencheurs de scène
 
-Nécessite Gladys 5.1 ou plus récent. Dans l'éditeur de scènes, rubrique
-**Intégrations** :
+Dans l'éditeur de scènes, rubrique **Intégrations** :
 
 - **Pointe critique Hydro-Québec annoncée** : Hydro-Québec a annoncé une
   pointe critique, généralement la veille ;
@@ -62,9 +94,9 @@ déclenche jamais : un redémarrage ne réannonce pas les pointes déjà connues
 2. Entrez le même **courriel/identifiant** et **mot de passe** que pour vous
    connecter à `session.hydroquebec.com`.
 3. Ajustez l'**intervalle de rafraîchissement** au besoin (Hydro-Québec ne
-   met à jour la consommation quotidienne qu'une fois par jour, avec 1 à 2
-   jours de délai : interroger plus vite que toutes les 30-60 minutes
-   n'apporte pas de données supplémentaires).
+   publie la consommation qu'avec environ un jour de délai : interroger plus
+   vite que toutes les 30-60 minutes n'apporte pas de données
+   supplémentaires).
 4. Enregistrez : vos contrats apparaissent dans l'onglet **Découverte**.
 
 ## Actions
@@ -85,18 +117,20 @@ vraie instance Gladys, pas seulement des tests automatisés :
 - La boucle de rafraîchissement, y compris le premier relevé qui apparaît
   juste après l'enregistrement de la configuration.
 - Un contrat sans période de facturation en cours côté Hydro-Québec (ex. un
-  compteur secondaire ou récemment ajouté) : la consommation, la
-  température, le solde et l'état des pannes continuent d'être publiés,
-  seul le coût quotidien reste vide pour celui-ci.
-- La consommation, la température, le solde et les pannes au tarif de base
-  « D », sur plusieurs cycles de rafraîchissement successifs.
+  compteur secondaire ou récemment ajouté) : la température, le solde et
+  l'état des pannes continuent d'être publiés, seul le coût moyen par jour
+  reste vide pour celui-ci.
 
-**Pas encore confirmé de façon indépendante** : les valeurs des pointes
-Crédit Hivernal (CPC) et Flex D (DPC) sont calculées directement à partir
-des mêmes valeurs déjà calculées qu'utilise l'intégration Home Assistant
-pour Hydro-Québec, mais aucun compte inscrit à l'une de ces options n'a
-encore utilisé cette intégration — si c'est votre cas et que quelque chose
-semble incorrect, merci d'ouvrir une issue.
+**Pas encore confirmé sur un vrai compte** :
+
+- la consommation par demi-heure et son coût calculé par Gladys (nouveau
+  dans cette version) ;
+- les valeurs des pointes Crédit hivernal (CPC) et Flex D (DPC) : elles sont
+  calculées à partir des mêmes valeurs qu'utilise l'intégration Home
+  Assistant pour Hydro-Québec, mais aucun compte inscrit à l'une de ces
+  options n'a encore utilisé cette intégration.
+
+Si quelque chose semble incorrect, merci d'ouvrir une issue.
 
 ## Notes importantes
 
@@ -107,9 +141,20 @@ semble incorrect, merci d'ouvrir une issue.
   une issue sur le dépôt le cas échéant.
 - Votre mot de passe est stocké chiffré par Gladys (champ `secret`) et n'est
   transmis qu'aux serveurs d'Hydro-Québec.
-- Le « coût quotidien moyen » est la moyenne $/jour de la période de
-  facturation en cours, pas un détail exact jour par jour : l'API gratuite
-  d'Hydro-Québec n'en expose pas pour le tarif de base « D ».
+- Le coût calculé par Gladys est une estimation : Hydro-Québec facture
+  environ tous les deux mois, Gladys compte les paliers par mois. L'écart
+  n'apparaît que si un mois très gourmand et un mois léger tombent dans la
+  même facture. Le Crédit hivernal n'est pas déduit de ce coût.
+- Les tarifs changent chaque 1er avril : une nouvelle version des modèles
+  suivra, et Gladys vous proposera de mettre votre contrat à jour.
+
+## Mise à jour depuis une version précédente
+
+L'onglet **Découverte** signale un changement de structure : cliquez sur
+**Mettre à jour**. La **consommation quotidienne** est remplacée par la
+consommation par demi-heure (son historique est supprimé), et le « coût
+quotidien moyen » devient le **coût moyen par jour (période en cours)**, un
+simple montant en dollars (son historique est conservé).
 
 ## Dépannage
 

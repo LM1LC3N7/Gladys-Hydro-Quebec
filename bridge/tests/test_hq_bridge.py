@@ -6,6 +6,7 @@ payload directly, and the clock hydroqc reads (hydroqc.utils.now) is pinned.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import os
@@ -126,3 +127,112 @@ def test_dpc_state_and_schedule(monkeypatch: pytest.MonkeyPatch) -> None:
     state = hq_bridge.dpc_peak_state(handler)
     assert state["current_state"] == "peak"
     assert state["peak_in_progress"] is True
+
+
+def hourly_rows(hours: list[str], kwh: float = 1.0) -> list[dict[str, object]]:
+    return [{"heure": hour, "consoTotal": kwh} for hour in hours]
+
+
+def test_hours_in_day_follows_daylight_saving() -> None:
+    assert hq_bridge.hours_in_day(datetime.date(2026, 1, 12)) == 24
+    assert hq_bridge.hours_in_day(datetime.date(2026, 3, 8)) == 23
+    assert hq_bridge.hours_in_day(datetime.date(2026, 11, 1)) == 25
+
+
+def test_hourly_intervals_split_each_hour_in_two_utc_halves() -> None:
+    day = datetime.date(2026, 1, 12)
+    result = hq_bridge.hourly_intervals(day, hourly_rows([f"{h:02d}:00:00" for h in range(24)], 1.5))
+    assert result["complete"] is True
+    assert len(result["intervals"]) == 48
+    # Local midnight in winter is 05:00 UTC.
+    assert result["intervals"][0] == {"starts_at": "2026-01-12T05:00:00Z", "kwh": 0.75}
+    assert result["intervals"][1] == {"starts_at": "2026-01-12T05:30:00Z", "kwh": 0.75}
+    # The 06:00-10:00 Flex D peak lands on whole slots: 11:00Z to 15:00Z.
+    assert result["intervals"][12]["starts_at"] == "2026-01-12T11:00:00Z"
+    assert sum(i["kwh"] for i in result["intervals"]) == pytest.approx(36)
+
+
+def test_hourly_intervals_on_the_autumn_change_keep_both_one_oclock_hours() -> None:
+    day = datetime.date(2026, 11, 1)
+    hours = ["00:00:00", "01:00:00", "01:00:00"] + [f"{h:02d}:00:00" for h in range(2, 24)]
+    result = hq_bridge.hourly_intervals(day, hourly_rows(hours))
+    assert result["complete"] is True
+    starts = [i["starts_at"] for i in result["intervals"]]
+    assert len(starts) == 50 and len(set(starts)) == 50
+    # 01:00 EDT (05:00Z), then 01:00 EST (06:00Z).
+    assert starts[2:6] == [
+        "2026-11-01T05:00:00Z",
+        "2026-11-01T05:30:00Z",
+        "2026-11-01T06:00:00Z",
+        "2026-11-01T06:30:00Z",
+    ]
+
+
+def test_hourly_intervals_on_the_spring_change_have_23_hours() -> None:
+    day = datetime.date(2026, 3, 8)
+    hours = ["00:00:00", "01:00:00"] + [f"{h:02d}:00:00" for h in range(3, 24)]
+    result = hq_bridge.hourly_intervals(day, hourly_rows(hours))
+    assert result["complete"] is True
+    assert result["intervals"][4]["starts_at"] == "2026-03-08T07:00:00Z"  # 03:00 EDT
+
+
+def test_hourly_intervals_skip_missing_hours_and_flag_the_day_incomplete() -> None:
+    day = datetime.date(2026, 1, 12)
+    rows = hourly_rows([f"{h:02d}:00:00" for h in range(24)])
+    rows[5]["consoTotal"] = None
+    rows[6]["heure"] = ""
+    result = hq_bridge.hourly_intervals(day, rows)
+    assert result["complete"] is False
+    assert len(result["intervals"]) == 44
+    assert hq_bridge.hourly_intervals(day, hourly_rows(["00:00:00"]))["complete"] is False
+
+
+def test_flex_d_events_keep_the_flex_d_offer_in_utc() -> None:
+    events = [
+        open_data_event("CPC-D", at(datetime.date(2026, 1, 12), 6), at(datetime.date(2026, 1, 12), 10)),
+        open_data_event("TPC-DPC", at(datetime.date(2026, 1, 13), 16), at(datetime.date(2026, 1, 13), 20)),
+        open_data_event("TPC-DPC", at(datetime.date(2026, 1, 12), 6), at(datetime.date(2026, 1, 12), 10)),
+        {"offre": "TPC-DPC", "dateDebut": "not a date", "dateFin": "2026-01-12T10:00:00-05:00"},
+        {"offre": "TPC-DPC", "dateDebut": "2026-01-12T10:00:00", "dateFin": "2026-01-12T12:00:00"},
+        {"offre": "TPC-DPC", "dateDebut": "2026-01-12T10:00:00-05:00", "dateFin": "2026-01-12T12:00:00"},
+        {"offre": "TPC-DPC", "dateFin": "2026-01-12T12:00:00-05:00"},
+    ]
+    assert hq_bridge.flex_d_events(events) == [
+        {"start": "2026-01-12T11:00:00Z", "end": "2026-01-12T15:00:00Z"},
+        {"start": "2026-01-13T21:00:00Z", "end": "2026-01-14T01:00:00Z"},
+    ]
+
+
+class FakeHourlyContract:
+    """Just what cmd_hourly touches on a hydroqc contract."""
+
+    contract_id = "c1"
+
+    def __init__(self, by_day: dict[datetime.date, object]) -> None:
+        self.by_day = by_day
+        self._hydro_client = type("Client", (), {"selected_contract": "c1"})()
+
+    async def get_hourly_consumption(self, day: datetime.date) -> object:
+        value = self.by_day[day]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
+def test_cmd_hourly_reports_days_without_data_as_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    day1, day2 = datetime.date(2026, 1, 11), datetime.date(2026, 1, 12)
+    contract = FakeHourlyContract(
+        {
+            day1: {"results": {"listeDonneesConsoEnergieHoraire": hourly_rows([f"{h:02d}:00:00" for h in range(24)])}},
+            day2: hq_bridge.HydroQcHTTPError("No data available for date 2026-01-12"),
+        }
+    )
+    monkeypatch.setattr(hq_bridge.state, "contracts_by_id", {"c1": (contract, None, None)})
+    result = asyncio.run(hq_bridge.cmd_hourly({"contract_id": "c1", "dates": ["2026-01-11", "2026-01-12"]}))
+    assert [d["date"] for d in result["days"]] == ["2026-01-11", "2026-01-12"]
+    assert result["days"][0]["complete"] is True and len(result["days"][0]["intervals"]) == 48
+    assert result["days"][1] == {"date": "2026-01-12", "complete": False, "intervals": []}
+
+    contract.by_day[day2] = hq_bridge.HydroQcHTTPError("HTTP 500")
+    with pytest.raises(hq_bridge.HydroQcHTTPError):
+        asyncio.run(hq_bridge.cmd_hourly({"contract_id": "c1", "dates": ["2026-01-12"]}))

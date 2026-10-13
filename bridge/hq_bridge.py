@@ -30,7 +30,7 @@ import os
 import sys
 import time
 import traceback
-from datetime import datetime
+from datetime import UTC, date, datetime, time as day_time, timedelta
 from typing import Any
 
 # hydroqc computes "now" as the system's LOCAL wall clock labelled as Eastern
@@ -45,7 +45,7 @@ time.tzset()
 
 from hydroqc import utils as hq_utils  # noqa: E402 - must follow the TZ pin above
 from hydroqc.contract import ContractDCPC, ContractDPC  # noqa: E402
-from hydroqc.error import HydroQcError  # noqa: E402
+from hydroqc.error import HydroQcError, HydroQcHTTPError  # noqa: E402
 from hydroqc.types import OutageStatus  # noqa: E402
 from hydroqc.webuser import WebUser  # noqa: E402
 
@@ -63,6 +63,12 @@ ACTIVE_OUTAGE_STATUSES = {OutageStatus.courante_confirme, OutageStatus.non_confi
 # Upper bound on the upcoming critical peaks returned per contract: a winter
 # has at most ~30 critical events (120 h of Flex D peaks, 4 h each).
 MAX_SCHEDULED_PEAKS = 40
+
+# Upper bound on the days one `hourly` call reads: one portal request each.
+MAX_HOURLY_DAYS = 31
+
+# Offer code of the Flex D events in Hydro-Québec's open data.
+FLEX_D_OFFER = "TPC-DPC"
 
 
 class BridgeState:
@@ -176,6 +182,54 @@ def latest_daily_consumption(daily: dict[str, Any]) -> dict[str, Any]:
     return max(days, key=lambda d: str(d.get("dateJourConso") or ""))
 
 
+def utc_iso(value: datetime) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def hours_in_day(day: date) -> int:
+    """23, 24 or 25: the length of a local (Eastern) day, daylight saving changes included."""
+    start = hq_utils.EST_TIMEZONE.localize(datetime.combine(day, day_time()))
+    end = hq_utils.EST_TIMEZONE.localize(datetime.combine(day + timedelta(days=1), day_time()))
+    return round((end - start).total_seconds() / 3600)
+
+
+def hourly_intervals(day: date, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The 30-minute intervals of one day of hourly readings, and whether the day is complete.
+
+    Each row carries the local (Eastern) clock hour it starts at ("HH:MM:SS")
+    and its kWh. Gladys prices 30-minute intervals: each hour is split in two
+    equal halves (the Flex D peaks start and end on the hour, so no half is
+    ever priced at the wrong rate). On the autumn daylight saving change, the
+    second "01:00:00" of the day is the standard-time one.
+    """
+    seen: set[str] = set()
+    kwh_by_start: dict[datetime, float] = {}
+    missing = False
+    for row in rows:
+        hour = str(row.get("heure") or "")
+        kwh = row.get("consoTotal")
+        try:
+            clock = day_time.fromisoformat(hour)
+            kwh = float(kwh)
+        except (TypeError, ValueError):
+            missing = True
+            continue
+        if kwh < 0:
+            missing = True
+            continue
+        start = hq_utils.EST_TIMEZONE.localize(datetime.combine(day, clock), is_dst=hour not in seen)
+        seen.add(hour)
+        start = start.astimezone(UTC)
+        kwh_by_start[start] = kwh_by_start.get(start, 0.0) + kwh
+
+    intervals = []
+    for start in sorted(kwh_by_start):
+        half = round(kwh_by_start[start] / 2, 6)
+        intervals.append({"starts_at": utc_iso(start), "kwh": half})
+        intervals.append({"starts_at": utc_iso(start + timedelta(minutes=30)), "kwh": half})
+    return {"complete": not missing and len(kwh_by_start) == hours_in_day(day), "intervals": intervals}
+
+
 def peak_schedule(peaks: list[Any], now: datetime) -> list[dict[str, Any]]:
     """Critical peaks not over yet, soonest first, with their pre-heat start."""
     upcoming = sorted((p for p in peaks if p.end_date > now), key=lambda p: p.start_date)
@@ -243,27 +297,87 @@ async def cmd_peaks(params: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def select_contract(contract: Any) -> None:
+    """Make hydroqc re-select this contract on the portal before its next request.
+
+    hydroqc's HydroClient is shared by every contract under one logged-in
+    WebUser, and its _select_contract() (called internally by every per-contract
+    request) only re-navigates the Hydro-Québec portal to the requested contract
+    when its *web session* has expired - it does NOT check whether the currently
+    selected contract is actually this one (hydro_api/client.py:
+    `if self.web_session_expiry > datetime.now(): return`). On an account with
+    several contracts (e.g. a secondary meter under the same subscription),
+    reading contract B shortly after contract A - the normal case, since Node
+    loops over every contract every cycle - reuses A's still-fresh web session
+    and silently returns A's data mislabeled as B's, with no error at all.
+    Forcing the session stale whenever the selected contract differs makes
+    hydroqc actually reselect before fetching this contract's data.
+    """
+    hydro_client = contract._hydro_client  # noqa: SLF001 - no public API for this
+    if hydro_client.selected_contract != contract.contract_id:
+        hydro_client.web_session_expiry = datetime.min
+
+
+async def cmd_hourly(params: dict[str, Any]) -> dict[str, Any]:
+    """Hourly consumption of the given days, as the 30-minute intervals Gladys prices.
+
+    One portal request per day (cached an hour by hydroqc). A day Hydro-Québec
+    has no data for yet (today, yesterday until it is published) comes back
+    empty and incomplete instead of failing the whole call.
+    """
+    contract = get_contract_entry(params)[0]
+    days_wanted = [date.fromisoformat(str(d)) for d in params.get("dates") or []][:MAX_HOURLY_DAYS]
+    select_contract(contract)
+    days = []
+    for day in days_wanted:
+        try:
+            payload = await contract.get_hourly_consumption(day)
+        except HydroQcHTTPError as exc:
+            if "No data available" not in str(exc):
+                raise
+            days.append({"date": day.isoformat(), "complete": False, "intervals": []})
+            continue
+        rows = ((payload or {}).get("results") or {}).get("listeDonneesConsoEnergieHoraire") or []
+        days.append({"date": day.isoformat(), **hourly_intervals(day, rows)})
+    return {"days": days}
+
+
+def flex_d_events(events: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """The Flex D peak events of an open-data payload, as UTC instants, soonest first."""
+    result = []
+    for event in events:
+        if event.get("offre") != FLEX_D_OFFER:
+            continue
+        try:
+            start = datetime.fromisoformat(str(event["dateDebut"]))
+            end = datetime.fromisoformat(str(event["dateFin"]))
+        except (KeyError, ValueError):
+            logger.warning("Ignoring a malformed peak event: %s", event)
+            continue
+        if start.tzinfo is None or end.tzinfo is None or end <= start:
+            logger.warning("Ignoring a malformed peak event: %s", event)
+            continue
+        result.append({"start": utc_iso(start), "end": utc_iso(end)})
+    return sorted(result, key=lambda e: e["start"])
+
+
+async def cmd_peak_events(_params: dict[str, Any]) -> list[dict[str, str]]:
+    """The Flex D peak events of Hydro-Québec's public open-data feed.
+
+    Account-independent (no portal request): it feeds the `hq-critical-peaks`
+    calendar of Gladys's Flex D contract template. The feed lists the events
+    of the current winter, announced the day before.
+    """
+    if state.webuser is None:
+        raise HydroQcError("Not logged in: call discover first")
+    hydro_client = state.webuser._hydro_client  # noqa: SLF001 - no public API for this
+    return flex_d_events(await hydro_client.get_open_data_peaks())
+
+
 async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
     contract_id = params["contract_id"]
     contract, account, _customer = get_contract_entry(params)
-
-    # hydroqc's HydroClient is shared by every contract under one logged-in
-    # WebUser, and its _select_contract() (called internally by both
-    # get_periods_info() and get_today_daily_consumption() below) only
-    # re-navigates the Hydro-Québec portal to the requested contract when
-    # its *web session* has expired - it does NOT check whether the
-    # currently selected contract is actually this one
-    # (hydro_api/client.py: `if self.web_session_expiry > datetime.now(): return`).
-    # On an account with several contracts (e.g. a secondary meter under the
-    # same subscription), polling contract B shortly after contract A - the
-    # normal case, since pollAllContracts() loops over every contract every
-    # cycle - reuses A's still-fresh web session and silently returns A's
-    # consumption data mislabeled as B's, with no error at all. Forcing the
-    # session stale here whenever the selected contract differs makes
-    # hydroqc actually reselect before fetching this contract's data.
-    hydro_client = contract._hydro_client  # noqa: SLF001 - no public API for this
-    if hydro_client.selected_contract != contract_id:
-        hydro_client.web_session_expiry = datetime.min
+    select_contract(contract)
 
     await account.get_info()
 
@@ -289,10 +403,12 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
         "rate": contract.rate,
         "rate_option": contract.rate_option,
         "balance": account.balance,
-        "daily_consumption_kwh": latest_day.get("consoTotalQuot"),
+        # The consumption itself goes through the `hourly` command (Gladys
+        # prices 30-minute intervals); the daily figures only give the
+        # average temperature of the latest published day.
         "avg_temperature": latest_day.get("tempMoyenneQuot"),
-        # The day those two figures are about (not the day of this poll):
-        # local midnight starting it, or None if Hydro-Québec gave no date.
+        # The day that temperature is about (not the day of this poll): local
+        # midnight starting it, or None if Hydro-Québec gave no date.
         "daily_consumption_at": day_start(latest_day.get("dateJourConso")),
         "daily_cost_mean": daily_cost_mean,
         "outage_active": any(o.status in ACTIVE_OUTAGE_STATUSES for o in contract.outages),
@@ -323,7 +439,14 @@ async def cmd_poll(params: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-COMMANDS = {"login": cmd_login, "discover": cmd_discover, "poll": cmd_poll, "peaks": cmd_peaks}
+COMMANDS = {
+    "login": cmd_login,
+    "discover": cmd_discover,
+    "poll": cmd_poll,
+    "peaks": cmd_peaks,
+    "hourly": cmd_hourly,
+    "peak_events": cmd_peak_events,
+}
 
 
 async def handle_request(line: str) -> None:

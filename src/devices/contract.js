@@ -21,9 +21,12 @@ const logger = createLogger({ name: 'contract' });
 // publishStates() accepts at most 100 states per request.
 const MAX_STATES_PER_REQUEST = 100;
 
-const FEATURE = {
-  DAILY_CONSUMPTION: 'daily_consumption',
-  DAILY_CONSUMPTION_COST: 'daily_consumption_cost',
+export const FEATURE = {
+  THIRTY_MINUTES_CONSUMPTION: 'thirty_minutes_consumption',
+  // Historical key, kept so the feature keeps its history: it used to be typed
+  // as a daily consumption cost, it is Hydro-Québec's average cost per day of
+  // the current billing period (see buildContractDevice).
+  AVERAGE_COST_PER_DAY: 'daily_consumption_cost',
   AVG_TEMPERATURE: 'avg_temperature',
   BALANCE: 'balance',
   POWER_OUTAGE: 'power_outage',
@@ -64,22 +67,30 @@ export function buildContractDevice(gladys, contract) {
 
   const features = [
     {
-      name: 'Daily consumption',
-      external_id: ids.feature(FEATURE.DAILY_CONSUMPTION),
+      // Fed with publishEnergyConsumption (src/hydroquebec/consumption.js),
+      // never publishStates: Hydro-Québec serves its readings a day late,
+      // and Gladys prices dated 30-minute intervals. Gladys derives the cost
+      // feature (`<external_id>_cost`) itself, priced by the energy contract
+      // the user attaches to this device (Tarif D, Flex D...).
+      name: 'Consumption (30 min)',
+      external_id: ids.feature(FEATURE.THIRTY_MINUTES_CONSUMPTION),
       category: DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-      type: DEVICE_FEATURE_TYPES.ENERGY_SENSOR.DAILY_CONSUMPTION,
+      type: DEVICE_FEATURE_TYPES.ENERGY_SENSOR.THIRTY_MINUTES_CONSUMPTION,
       unit: DEVICE_FEATURE_UNITS.KILOWATT_HOUR,
       min: 0,
-      max: 2000,
+      max: 100,
       read_only: true,
       has_feedback: false,
       keep_history: true,
     },
     {
-      name: 'Average daily cost (current period)',
-      external_id: ids.feature(FEATURE.DAILY_CONSUMPTION_COST),
-      category: DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-      type: DEVICE_FEATURE_TYPES.ENERGY_SENSOR.DAILY_CONSUMPTION_COST,
+      // A plain amount, not an energy cost: Hydro-Québec's average cost per
+      // day over the current billing period. Typed as a currency so it is
+      // never mistaken for the cost Gladys computes from the consumption.
+      name: 'Average cost per day (current period)',
+      external_id: ids.feature(FEATURE.AVERAGE_COST_PER_DAY),
+      category: DEVICE_FEATURE_CATEGORIES.CURRENCY,
+      type: DEVICE_FEATURE_TYPES.CURRENCY.DECIMAL,
       unit: DEVICE_FEATURE_UNITS.DOLLAR,
       min: 0,
       max: 500,
@@ -325,19 +336,18 @@ export function peakFeatureStates(ids, { cpc, dpc } = {}) {
 /**
  * Every feature state of one `poll` snapshot (the flat JSON of the `poll`
  * command of bridge/hq_bridge.py: already-derived hydroqc values, no
- * Hydro-Québec-specific parsing left to do here).
+ * Hydro-Québec-specific parsing left to do here). The consumption is not one
+ * of them: it is published apart, as dated intervals (consumption.js).
  *
- * The daily consumption and average temperature describe a PAST day
- * (Hydro-Québec publishes 1 to 2 days late): they carry that day as
- * `created_at` (`daily_consumption_at`, local midnight), so Gladys files them
- * under the day they measure instead of the day they were read.
+ * The average temperature describes a PAST day (Hydro-Québec publishes 1 to 2
+ * days late): it carries that day as `created_at` (`daily_consumption_at`,
+ * local midnight), so Gladys files it under the day it measures instead of
+ * the day it was read.
  */
 export function contractStates(ids, snapshot) {
   const { states, pushNumber, pushBinary } = statesBuilder(ids);
-  const dayAt = snapshot.daily_consumption_at ?? undefined;
-  pushNumber(FEATURE.DAILY_CONSUMPTION, snapshot.daily_consumption_kwh, dayAt);
-  pushNumber(FEATURE.AVG_TEMPERATURE, snapshot.avg_temperature, dayAt);
-  pushNumber(FEATURE.DAILY_CONSUMPTION_COST, snapshot.daily_cost_mean);
+  pushNumber(FEATURE.AVG_TEMPERATURE, snapshot.avg_temperature, snapshot.daily_consumption_at ?? undefined);
+  pushNumber(FEATURE.AVERAGE_COST_PER_DAY, snapshot.daily_cost_mean);
   pushNumber(FEATURE.BALANCE, snapshot.balance);
   pushBinary(FEATURE.POWER_OUTAGE, snapshot.outage_active);
   return [...states, ...peakFeatureStates(ids, snapshot)];

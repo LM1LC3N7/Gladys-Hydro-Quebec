@@ -25,12 +25,14 @@ export class PeakMonitor {
    * @param {object} options.publisher a StatePublisher
    * @param {() => { session: object|null, config: object }} options.context the current session and config
    * @param {object} options.logger
+   * @param {() => Promise<void>} [options.onAnnouncementCheck] also run at each announcement check (peak calendar)
    */
-  constructor({ gladys, publisher, context, logger, scheduler }) {
+  constructor({ gladys, publisher, context, logger, scheduler, onAnnouncementCheck }) {
     this.gladys = gladys;
     this.publisher = publisher;
     this.context = context;
     this.logger = logger;
+    this.onAnnouncementCheck = onAnnouncementCheck;
     this.tracker = new PeakTracker();
     this.scheduler =
       scheduler ??
@@ -97,5 +99,6 @@ export class PeakMonitor {
         this.logger.error(`Peak announcement check failed for contract ${contract.contractId}`, err);
       }
     }
+    await this.onAnnouncementCheck?.();
   }
 }
