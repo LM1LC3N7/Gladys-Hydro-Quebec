@@ -5,7 +5,7 @@ connects an Hydro-Québec online account: consumption per half-hour (priced
 by Gladys's energy contracts: Rate D and Flex D templates, Flex D peak
 calendar), average outdoor temperature, account balance, outages, and — for
 the dynamic rate options — Winter Credit (CPC) and Flex D (DPC) peak events.
-Requires Gladys 5.2 or later. One Gladys device is
+Requires Gladys 5.3 or later. One Gladys device is
 created per Hydro-Québec **contract** on the account (an account can have
 several: a primary residence, a rental, a cottage...).
 
