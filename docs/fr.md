@@ -6,7 +6,7 @@ température extérieure moyenne, solde du compte, pannes et, si vous êtes
 inscrit aux options tarifaires dynamiques, les pointes du Crédit hivernal
 (CPC) et de Flex D (DPC).
 
-Nécessite **Gladys 5.2** ou plus récent.
+Nécessite **Gladys 5.3** ou plus récent.
 
 ## Ce que vous obtenez
 

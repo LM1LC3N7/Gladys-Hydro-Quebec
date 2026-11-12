@@ -6,7 +6,7 @@ Flex D), average outdoor temperature, account balance, outages, and — if you
 are enrolled in the dynamic rate options — Winter Credit (CPC) and Flex D
 (DPC) peak events.
 
-Requires **Gladys 5.2** or later.
+Requires **Gladys 5.3** or later.
 
 ## What you get
 
